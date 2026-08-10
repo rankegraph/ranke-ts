@@ -2,15 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { decodeClaim } from './codec.ts'
-import { contentSize, contentWithheld, inlineBytes } from './content.ts'
+import { contentComplete, contentHeld, contentSize, inlineBytes } from './content.ts'
 import { type Capped, capped, cborBytes } from './testing/fixtures.ts'
 
 // A read may cap the content it inlines (R-QCONTENT), so a client receives claims whose
-// content is partial or absent while content_size still states the true length. These
-// bytes come from ranke-go's query encoder, the reference for that rule.
-//
-// Reading such a claim is the whole point: a browser client asks for ids and short
-// content, then fetches the full claim only where it needs the bytes.
+// content is partial or absent while content_size still states the true length. The bytes
+// come from ranke-go's query encoder, the reference for that rule.
 
 function find(label: string): Capped {
   const c = capped.find((x) => x.label === label)
@@ -22,34 +19,60 @@ test('every content option ranke-go serves decodes', () => {
   assert.ok(capped.length >= 6, 'the generator covers each option R-QCONTENT admits')
   for (const c of capped) {
     const claim = decodeClaim(cborBytes(c), c.id)
-    const got = inlineBytes(claim.content)
-    assert.equal(got === null ? 0 : got.length, c.inline, `${c.label}: inlined bytes`)
+    assert.equal(contentHeld(claim.content), c.inline, `${c.label}: bytes held`)
+    assert.equal(inlineBytes(claim.content)?.length, c.inline, `${c.label}: the bytes themselves`)
   }
 })
 
-// The claim declares what it holds whether or not the bytes came with it, so a client
-// can tell "no content" from "content I did not receive" and ask again.
-test('a capped claim still declares its true content size', () => {
+// The size is the content's, whatever the record holds of it. Writing the truncated
+// length would leave the shortfall unrecoverable, and the record unverifiable.
+test('a capped claim declares the content length, not the prefix length', () => {
   for (const c of capped) {
     const claim = decodeClaim(cborBytes(c), c.id)
     assert.equal(contentSize(claim.content), c.size, `${c.label}: content_size`)
-    assert.equal(contentWithheld(claim.content), c.inline === 0, `${c.label}: withheld`)
+    assert.equal(c.declared, c.size, `${c.label}: ranke-go declared the full length`)
+  }
+})
+
+// The predicate a reader needs: a prefix carries the same kind and the same non-zero size
+// as whole content, so only the comparison tells them apart.
+test('contentComplete tells a prefix from the whole content', () => {
+  for (const c of capped) {
+    const claim = decodeClaim(cborBytes(c), c.id)
+    assert.equal(
+      contentComplete(claim.content),
+      c.inline === c.size,
+      `${c.label}: held ${c.inline} of ${c.size}`,
+    )
+  }
+  // Both partial cases must be visible as partial: one holding some bytes, one none.
+  const partial = capped.filter((c) => c.inline < c.size)
+  assert.ok(
+    partial.some((c) => c.inline > 0) && partial.some((c) => c.inline === 0),
+    'the fixtures cover a cut prefix and a content held back entirely',
+  )
+  for (const c of partial) {
+    assert.equal(contentComplete(decodeClaim(cborBytes(c), c.id).content), false, c.label)
   }
 })
 
 test('content in full is the record whose hash is the id', () => {
   const full = find('max 0, content in full')
   const claim = decodeClaim(cborBytes(full), full.id)
-  assert.equal(inlineBytes(claim.content)?.length, full.size, 'every byte arrived')
+  assert.equal(contentHeld(claim.content), full.size, 'every byte arrived')
+  assert.ok(contentComplete(claim.content))
   assert.equal(claim.id, full.id)
 })
 
+// A record holding none of its content still declares it, reading as "inline, nothing
+// held" — which is what lets a client ask again.
 test('an absent content section inlines nothing', () => {
   const none = find('content absent, so none is inlined')
   assert.equal(none.inline, 0, 'ranke-go inlined none of it')
   const claim = decodeClaim(cborBytes(none), none.id)
-  assert.equal(inlineBytes(claim.content), null)
-  assert.ok(contentWithheld(claim.content), 'withheld, which is not the same as absent')
+  assert.equal(contentHeld(claim.content), 0)
+  assert.equal(claim.content.kind, 'inline', 'content exists; this record holds none of it')
+  assert.equal(contentComplete(claim.content), false)
   assert.equal(contentSize(claim.content), none.size)
 })
 
@@ -57,11 +80,12 @@ test('cutoff delivers a prefix of the content, omit none of the value', () => {
   const cut = find('a cap the content overruns, cut at it')
   assert.equal(cut.inline, cut.cap, 'cut exactly at the cap')
   const cutClaim = decodeClaim(cborBytes(cut), cut.id)
-  assert.equal(inlineBytes(cutClaim.content)?.length, cut.cap)
+  assert.equal(contentHeld(cutClaim.content), cut.cap)
+  assert.equal(contentComplete(cutClaim.content), false, 'a prefix is not the content')
 
   const omitted = find('a cap the content overruns, omitted whole')
   assert.equal(omitted.inline, 0)
-  assert.equal(inlineBytes(decodeClaim(cborBytes(omitted), omitted.id).content), null)
+  assert.equal(contentHeld(decodeClaim(cborBytes(omitted), omitted.id).content), 0)
 })
 
 // An absent overflow is omit (R-QCONTENT), so the two must serve the same bytes.

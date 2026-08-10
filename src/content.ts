@@ -24,11 +24,11 @@ export type ContentRef =
   | {
       readonly kind: 'inline'
       /**
-       * The bytes, or null where the record declares content it did not carry — what a
-       * read under a content cap delivers (R-QCONTENT), and what a structure-only cache
-       * holds. `size` still states the true length, so ask again with a wider cap.
+       * What this record holds, which a capped read may cut to a prefix or to nothing
+       * (R-QCONTENT). Compare its length against `size` — see contentComplete.
        */
-      readonly bytes: Uint8Array | null
+      readonly bytes: Uint8Array
+      /** The content's full length, whatever `bytes` holds of it. */
       readonly size: number
       /** The media type, "class/sub" — mandatory wherever content is present. */
       readonly encoding: string
@@ -60,18 +60,31 @@ export function contentEncoding(c: ContentRef): string {
 }
 
 /**
- * inlineBytes returns the inline bytes, or null when the content is external, absent,
- * or withheld — external content lives in the Universe and is fetched by its hash.
+ * inlineBytes returns the bytes the record holds, or null when the content is not
+ * inline — external content lives in the Universe and is fetched by its hash. An inline
+ * content a read cut to nothing returns an empty array, that record holding no bytes.
  */
 export function inlineBytes(c: ContentRef): Uint8Array | null {
   return c.kind === ContentInline ? c.bytes : null
 }
 
+/** contentHeld is how many bytes this record carries, of the `size` it declares. */
+export function contentHeld(c: ContentRef): number {
+  return c.kind === ContentInline ? c.bytes.length : 0
+}
+
 /**
- * contentWithheld reports content the record declares without carrying: a read under a
- * cap (R-QCONTENT) inlines a prefix of a claim's content and leaves the rest out, and a
- * cache may hold structure alone. Distinct from having no content, which `size` 0 says.
+ * contentComplete reports whether the record holds every byte it declares. A capped read
+ * (R-QCONTENT) serves a prefix, which kind and size alone cannot distinguish from whole
+ * content. External content is complete only once fetched; no content, trivially.
  */
-export function contentWithheld(c: ContentRef): boolean {
-  return c.kind === ContentInline && c.bytes === null
+export function contentComplete(c: ContentRef): boolean {
+  switch (c.kind) {
+    case ContentNone:
+      return true
+    case ContentExternal:
+      return false
+    default:
+      return c.bytes.length === c.size
+  }
 }

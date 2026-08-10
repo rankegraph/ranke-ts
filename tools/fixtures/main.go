@@ -68,8 +68,9 @@ type capped struct {
 	ID       string `json:"id"`
 	Cap      int    `json:"cap"`
 	Overflow string `json:"overflow"`
-	Size     int    `json:"size"`   // the content length the claim declares
-	Inline   int    `json:"inline"` // the bytes the served record actually carries
+	Size     int    `json:"size"`     // the content's true length, taken from the claim built
+	Declared int    `json:"declared"` // content_size read back OFF the served record
+	Inline   int    `json:"inline"`   // the bytes the served record actually carries
 	CBOR     string `json:"cbor"`
 	JSON     any    `json:"json"`
 }
@@ -275,9 +276,11 @@ func main() {
 		inline, err := served.Node().GetInlineContent()
 		must(err)
 
+		// Declared comes off the served record rather than the claim, so a fixture that
+		// wrote a truncated content_size would show up here instead of passing silently.
 		f := capped{
 			Label: cc.label, ID: src.ID().String(), Cap: -1,
-			Size: len(srcInline), Inline: len(inline),
+			Size: len(srcInline), Declared: int(served.Node().GetContentSize()), Inline: len(inline),
 			CBOR: hex.EncodeToString(cborBytes), JSON: projected,
 		}
 		if cc.oc != nil {
