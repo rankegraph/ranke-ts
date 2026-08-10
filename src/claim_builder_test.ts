@@ -227,7 +227,7 @@ test('the stored record holds the bytes the id was computed over', () => {
   for (const { label, built } of equivalenceCases()) {
     const id = parseId(built.id)
     if (id.algorithm() !== 'sha2-256') {
-      assert.equal(id.algorithm(), 'ed25519-pub', `${label}: an id is a hash or a signature`)
+      assert.equal(id.algorithm(), 'eddsa', `${label}: an id is a hash or a signature`)
       continue
     }
     assert.equal(hashContent(nodePreimage(built.bytes)).toString(), built.id, label)
@@ -302,13 +302,15 @@ test('a signer produces a multikey-framed id', () => {
   assert.equal(message[0], 0x12, 'the sha2-256 multicodec')
   assert.equal(message[1], 0x20, 'the digest length')
 
-  // The id is the signature under the Ed25519 multikey framing, so it reads as a
-  // signature rather than a hash and carries the bytes the signer returned.
+  // The id is the signature framed under eddsa, so it reads as a signature rather than
+  // as a hash or a public key, and carries the bytes the signer returned.
   const id = parseId(built.id)
-  assert.equal(id.algorithm(), 'ed25519-pub')
+  assert.equal(id.algorithm(), 'eddsa')
   const raw = id.rawBytes()
-  assert.equal(raw.length, 2 + 64)
-  assert.deepEqual(Uint8Array.from(raw.subarray(2)), signature)
+  assert.deepEqual(Uint8Array.from(raw.subarray(0, 3)), Uint8Array.from([0xed, 0xa1, 0x03]),
+    'the varint of 0xd0ed')
+  assert.equal(raw.length, 3 + 64)
+  assert.deepEqual(Uint8Array.from(raw.subarray(3)), signature)
 })
 
 test('a claim declaring a key refuses to identity-sign', () => {

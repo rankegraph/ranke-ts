@@ -357,20 +357,18 @@ function checkSigningConsistency(signer: Uint8Array, declared: Uint8Array): void
 
 // multikey frames a signature as ranke-go does: the Ed25519 multicodec as a varint,
 // which is two bytes, then the signature.
+// multikey frames a signature under eddsa (0xd0ed, varint ed a1 03), distinct from a
+// pubkey's ed25519-pub so neither reads as the other (V-SIGN).
 function multikey(signature: Uint8Array): Uint8Array {
-  const out = new Uint8Array(2 + signature.length)
-  out[0] = 0xed
-  out[1] = 0x01
-  out.set(signature, 2)
+  const code = [0xed, 0xa1, 0x03]
+  const out = new Uint8Array(code.length + signature.length)
+  out.set(code, 0)
+  out.set(signature, code.length)
   return out
 }
 
 function inlineOf(content: ContentRef | undefined): Uint8Array {
-  if (content === undefined || content.kind !== 'inline') return new Uint8Array(0)
-  // checkContent has already refused withheld bytes; hashing zero of them here would
-  // mint an id for content the claim never carried.
-  if (content.bytes === null) throw new RankeBuildError('inline content without its bytes')
-  return content.bytes
+  return content !== undefined && content.kind === 'inline' ? content.bytes : new Uint8Array(0)
 }
 
 function resolveType(
@@ -403,16 +401,14 @@ function checkContent(content: ContentRef | undefined): void {
     throw new RankeBuildError(`invalid encoding subtype ${JSON.stringify(typeSub)}`)
   }
   if (content.kind === 'inline') {
-    // A claim's id is computed over its inline bytes, so content declared without them
-    // can be read and forwarded but never built into a new claim.
-    if (content.bytes === null) {
-      throw new RankeBuildError('inline content declared without its bytes cannot be signed')
-    }
     if (content.bytes.length > maxInlineContent) {
       throw new RankeBuildError(
         `inline content is at most ${maxInlineContent} bytes; larger belongs in external content`,
       )
     }
+    // Which also refuses a claim built from a capped read's prefix: an id is computed
+    // over the bytes, so signing a partial content would mint an id for content that
+    // never existed.
     if (content.size !== content.bytes.length) {
       throw new RankeBuildError(
         `content_size ${content.size} is not the ${content.bytes.length} bytes carried`,

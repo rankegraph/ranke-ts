@@ -8,8 +8,13 @@ import { sha256 } from './internal/sha256.ts'
 
 /** Multicodec code for a SHA2-256 multihash. */
 const CODE_SHA2_256 = 0x12
-/** Multicodec code for an Ed25519 public key, which also frames its signatures. */
+/** Multicodec code for an Ed25519 public key. */
 const CODE_ED25519_PUB = 0xed
+/**
+ * Multicodec code for an EdDSA signature, which is what frames a node id (V-SIGN). A
+ * pubkey carries CODE_ED25519_PUB, so the code alone says which of the two a payload is.
+ */
+const CODE_EDDSA = 0xd0ed
 
 const SHA2_256_LEN = 32
 
@@ -61,6 +66,7 @@ export class Id {
     if (decodeMultihash(this.#raw) !== null) return 'sha2-256'
     const v = readVarint(this.#raw, 0)
     if (v === null) return 'unknown'
+    if (v.value === CODE_EDDSA) return 'eddsa'
     if (v.value === CODE_ED25519_PUB) return 'ed25519-pub'
     return '0x' + v.value.toString(16)
   }
