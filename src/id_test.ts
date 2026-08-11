@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { RankeIdError, hashContent, hashFromMultihashBytes, idFromBytes, parseId } from './id.ts'
+import { contributor } from './testing/fixtures.ts'
 
 // Ids produced by ranke-go's HashContent — the reference implementation is the
 // oracle, so a divergence in the digest, the multihash framing, or the base32
@@ -71,27 +72,30 @@ test('equal compares by payload, not identity', () => {
 })
 
 // A node id is a signature, so it frames no multihash and the multicodec reading
-// names it. This one is a contributor claim id from ranke-go, built over a fixed
-// seed and timestamp.
-const GO_SIGNATURE_ID =
-  'b5uawx4g6p24fbzstte4xxtjbcuorbusy4ohvvuowc5cirr3otq5ipqbp66jlje4yshcqycpbjyrcre2pfw54stffl5tbfm2y4sstzffrb4'
+// names it. Taken from the generated fixtures rather than transcribed: this is the
+// only cross-check that ranke-ts reads the code ranke-go actually writes, so a
+// hand-copied id would leave the framing agreeing with itself alone.
+const goSignatureId = contributor.id
 
 test('algorithm names the scheme', () => {
   assert.equal(hashContent(Buffer.from('abc')).algorithm(), 'sha2-256')
-  assert.equal(parseId(GO_SIGNATURE_ID).algorithm(), 'ed25519-pub')
+  assert.equal(parseId(goSignatureId).algorithm(), 'eddsa')
 })
 
-// The multicodec is a varint, so Ed25519 (0xed) occupies two bytes — a reader
-// treating it as one would stop mid-code and mis-frame every signature.
-test('a signature id carries the two-byte Ed25519 varint', () => {
-  const raw = parseId(GO_SIGNATURE_ID).rawBytes()
-  assert.equal(raw[0], 0xed)
-  assert.equal(raw[1], 0x01)
-  assert.equal(raw.length, 2 + 64, 'varint plus an Ed25519 signature')
+// eddsa (0xd0ed) is three varint bytes, where the ed25519-pub it replaced was two.
+// A reader stopping short mis-frames every signature (V-SIGN).
+test('a signature id carries the eddsa varint', () => {
+  const raw = parseId(goSignatureId).rawBytes()
+  assert.deepEqual(
+    Uint8Array.from(raw.subarray(0, 3)),
+    Uint8Array.from([0xed, 0xa1, 0x03]),
+    'the varint of 0xd0ed',
+  )
+  assert.equal(raw.length, 3 + 64, 'varint plus an Ed25519 signature')
 })
 
-// The same framing carries a public key, which is how a contributor claim's
-// content is encoded (ranke-go EncodePublicKey).
+// A pubkey keeps ed25519-pub, which is what makes the code alone tell the two
+// apart — it is a contributor claim's content (ranke-go EncodePublicKey).
 test('the multikey framing round-trips through parseId', () => {
   const pubkey = Buffer.from(
     'ed0103a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8',
