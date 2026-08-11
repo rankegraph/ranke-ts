@@ -36,33 +36,44 @@ export class RankeDecodeError extends Error {
   override readonly name: string = 'RankeDecodeError'
 }
 
-// The claim file wraps the node record under key 1, and the node record's own keys
-// are those of ranke-go's encNode / encEdge. A key absent means its zero value: the
-// encoder drops an empty string, an empty collection and a zero number.
+// The claim file wraps the node record under key 1, and the node record's own keys are
+// the ones V-SER fixes. A key absent means its zero value: the encoder drops an empty
+// string, an empty collection and a zero number.
 const CLAIM_NODE = 1
 
-const N_TYPE_CLASS = 1
-const N_TYPE_SUB = 2
-const N_ENCODING_CLASS = 3
-const N_ENCODING_SUB = 4
-const N_CONTENT_HASH = 5
-const N_CREATED_AT = 6
-const N_EDGES = 7
-const N_FIELDS = 8
-const N_CONTENT = 9
-const N_CONTENT_SIZE = 11
-const N_HEIGHT = 12
+// Keys 1 to 8 are the slots a node and an edge share, so one number means one thing in
+// either record. A node then takes 9 to 11 and an edge 12 to 13 (V-SER).
+const SHARED_TYPE_CLASS = 1
+const SHARED_TYPE_SUB = 2
+const SHARED_ENCODING_CLASS = 3
+const SHARED_ENCODING_SUB = 4
+const SHARED_CONTENT_HASH = 5
+const SHARED_CONTENT = 6
+const SHARED_CONTENT_SIZE = 7
+const SHARED_FIELDS = 8
 
-const E_REFERENCE = 1
-const E_TYPE_CLASS = 2
-const E_TYPE_SUB = 3
-const E_CONTENT_HASH = 4
-const E_RELATION_DIRECTION = 5
-const E_FIELDS = 6
-const E_CONTENT_SIZE = 7
-const E_ENCODING_CLASS = 8
-const E_ENCODING_SUB = 9
-const E_CONTENT = 10
+const N_TYPE_CLASS = SHARED_TYPE_CLASS
+const N_TYPE_SUB = SHARED_TYPE_SUB
+const N_ENCODING_CLASS = SHARED_ENCODING_CLASS
+const N_ENCODING_SUB = SHARED_ENCODING_SUB
+const N_CONTENT_HASH = SHARED_CONTENT_HASH
+const N_CONTENT = SHARED_CONTENT
+const N_CONTENT_SIZE = SHARED_CONTENT_SIZE
+const N_FIELDS = SHARED_FIELDS
+const N_CREATED_AT = 9
+const N_EDGES = 10
+const N_HEIGHT = 11
+
+const E_TYPE_CLASS = SHARED_TYPE_CLASS
+const E_TYPE_SUB = SHARED_TYPE_SUB
+const E_ENCODING_CLASS = SHARED_ENCODING_CLASS
+const E_ENCODING_SUB = SHARED_ENCODING_SUB
+const E_CONTENT_HASH = SHARED_CONTENT_HASH
+const E_CONTENT = SHARED_CONTENT
+const E_CONTENT_SIZE = SHARED_CONTENT_SIZE
+const E_FIELDS = SHARED_FIELDS
+const E_REFERENCE = 12
+const E_RELATION_DIRECTION = 13
 
 /** DecodeOptions tunes what a decode spends effort on. */
 export interface DecodeOptions {
@@ -204,9 +215,10 @@ function content(
       encoding,
     })
   }
-  // A size with neither the bytes nor an address: content the producer declared and did
-  // not send, which a capped read delivers (R-QCONTENT).
-  if (size > 0) return Object.freeze({ kind: 'inline', bytes: null, size, encoding })
+  // A size with neither the bytes nor an address: content the record declares and does
+  // not carry, which a read cutting content to nothing delivers (R-QCONTENT). It holds
+  // an empty run of bytes rather than none, so a reader compares lengths as ever.
+  if (size > 0) return Object.freeze({ kind: 'inline', bytes: new Uint8Array(0), size, encoding })
   return contentNone
 }
 
@@ -366,10 +378,15 @@ function contentFromRef(ref: ContentRef | undefined): ContentRef {
   if (ref.kind === 'external') {
     return Object.freeze({ kind: 'external', hash: ref.hash, size: ref.size, encoding: ref.encoding })
   }
-  // Content declared without its bytes carries its length and nothing else, so a claim
-  // built from such a declaration says what it holds and admits it has none of it.
-  if (ref.bytes === null) {
-    return Object.freeze({ kind: 'inline', bytes: null, size: ref.size, encoding: ref.encoding })
+  // Content declared but not carried keeps its length, so the claim states what exists
+  // while holding none of it.
+  if (ref.bytes.length === 0 && ref.size > 0) {
+    return Object.freeze({
+      kind: 'inline',
+      bytes: new Uint8Array(0),
+      size: ref.size,
+      encoding: ref.encoding,
+    })
   }
   if (ref.bytes.length === 0) return contentNone
   return Object.freeze({
@@ -523,10 +540,9 @@ function pushContent(
   entries.push([encodeUint(keys.encodingSub), encodeText(aliasToWire(typeSub, encodingSubToAlias))])
   if (content.size !== 0) entries.push([encodeUint(keys.size), encodeUint(content.size)])
   if (content.kind === 'inline') {
-    // Withheld bytes leave the slot empty, the size above standing for what is missing.
-    if (content.bytes !== null && content.bytes.length > 0) {
-      entries.push([encodeUint(keys.inline), encodeBytes(content.bytes)])
-    }
+    // Bytes the record does not hold leave the slot out, the size above standing for
+    // what exists.
+    if (content.bytes.length > 0) entries.push([encodeUint(keys.inline), encodeBytes(content.bytes)])
     return
   }
   entries.push([encodeUint(keys.hash), encodeBytes(parseId(content.hash).rawBytes())])

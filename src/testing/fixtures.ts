@@ -51,8 +51,14 @@ export interface Capped {
   readonly cap: number
   /** The `overflow` asked for; "" where none was, which means omit. */
   readonly overflow: string
-  /** The content length the claim declares, whatever the record carries. */
+  /** The content's true length, taken from the claim that was built. */
   readonly size: number
+  /**
+   * content_size read back off the served record. It must equal `size` for every
+   * option: were a capping engine to write the truncated length, the record would stop
+   * verifying against its id and the shortfall would be unrecoverable.
+   */
+  readonly declared: number
   /** The bytes the served record carries, which is what the cap decided. */
   readonly inline: number
   readonly cbor: string
