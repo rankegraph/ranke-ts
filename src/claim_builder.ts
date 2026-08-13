@@ -94,7 +94,7 @@ export interface EdgeInput {
   readonly content?: ContentRef
   /**
    * referenced is the claim `reference` names, for the fields an edge takes from its
-   * target: the delete_by every edge must carry (R-DPLANNED). Supply it wherever the
+   * target: the delete_by every edge must carry (`R-DPLANNED`). Supply it wherever the
    * target is in hand, since an edge cannot learn this after it is built.
    */
   readonly referenced?: Claim
@@ -148,7 +148,7 @@ function buildEdge(input: EdgeInput): BuiltEdge {
     throw new RankeBuildError(`invalid edge subtype ${JSON.stringify(typeSub)}`)
   }
 
-  // A relation edge states its direction and nothing else does (§4.7).
+  // A relation edge states its direction and nothing else does (§4.7, `V-REL`).
   const dir = input.relationDirection ?? 0
   if (typeClass === 'relation') {
     if (dir !== 1 && dir !== -1) {
@@ -161,7 +161,7 @@ function buildEdge(input: EdgeInput): BuiltEdge {
   checkContent(input.content)
   let fields = input.fields
 
-  // The target's schedule travels with the reference (R-DPLANNED), so it is part of the
+  // The target's schedule travels with the reference (`R-DPLANNED`), so it is part of the
   // edge from the start; an edge stating one keeps what it states.
   if (input.referenced !== undefined) {
     const due = input.referenced.fields[FieldDeleteBy]
@@ -284,7 +284,8 @@ function assembleEdges(
   }
 
   checkEdgeCardinality(edges)
-  // §3.5: a claim of these classes rests on stated provenance.
+  // §3.5, `V-PROV`: a claim of these classes rests on stated provenance. A
+  // contribution/contributor edge does not satisfy it.
   if (requiresProvenance(typeClass) && !edges.some((e) => e.record.typeClass === EdgeClassDerivation)) {
     throw new RankeBuildError(`a ${typeClass}/* claim carries at least one derivation/* edge`)
   }
@@ -302,7 +303,7 @@ function requiresProvenance(typeClass: string): boolean {
 }
 
 // checkDiffEdgeNames requires a unique, non-empty name on every edge of a diff claim
-// beyond the singletons, since the overlay is name-keyed.
+// beyond the singletons, since the overlay is name-keyed (`V-DIFFEDGE`).
 function checkDiffEdgeNames(edges: readonly BuiltEdge[]): void {
   const seen = new Set<string>()
   for (const { record } of edges) {
@@ -323,7 +324,8 @@ function checkDiffEdgeNames(edges: readonly BuiltEdge[]): void {
   }
 }
 
-// checkEdgeCardinality enforces the per-claim singletons.
+// checkEdgeCardinality enforces the per-claim singletons: one contributor edge
+// (`V-ROOT`, an initial claim carrying none) and at most one diff edge (`V-DIFF`).
 function checkEdgeCardinality(edges: readonly BuiltEdge[]): void {
   let contributors = 0
   let diffs = 0
@@ -358,7 +360,7 @@ function checkSigningConsistency(signer: Uint8Array, declared: Uint8Array): void
 // multikey frames a signature as ranke-go does: the Ed25519 multicodec as a varint,
 // which is two bytes, then the signature.
 // multikey frames a signature under eddsa (0xd0ed, varint ed a1 03), distinct from a
-// pubkey's ed25519-pub so neither reads as the other (V-SIGN).
+// pubkey's ed25519-pub so neither reads as the other (`V-SIGN`).
 function multikey(signature: Uint8Array): Uint8Array {
   const code = [0xed, 0xa1, 0x03]
   const out = new Uint8Array(code.length + signature.length)
@@ -384,7 +386,7 @@ function resolveType(
   return { typeClass, typeSub }
 }
 
-// checkContent holds a declaration to V-CONTENT: an encoding wherever content is
+// checkContent holds a declaration to `V-CONTENT`: an encoding wherever content is
 // present, its exact byte length, and inline bytes within the construction cap.
 function checkContent(content: ContentRef | undefined): void {
   if (content === undefined || content.kind === 'none') return
@@ -416,7 +418,7 @@ function checkContent(content: ContentRef | undefined): void {
     }
     return
   }
-  // External content is addressed by H(content) (V-CONTENT), so the address is a
+  // External content is addressed by H(content) (`V-CONTENT`), so the address is a
   // multihash of the one algorithm the ADT hashes with, and a reader accepts nothing else.
   const address = parseId(content.hash)
   if (address.algorithm() !== 'sha2-256') {
@@ -430,7 +432,7 @@ function checkContent(content: ContentRef | undefined): void {
   }
 }
 
-// undeletableSubtypes is R-DSTRUCT's closed set, by subtype.
+// undeletableSubtypes is `R-DSTRUCT`'s closed set, by subtype.
 const undeletableSubtypes = new Set([
   NodeSubtypeContributor,
   NodeSubtypeBranches,
@@ -438,11 +440,11 @@ const undeletableSubtypes = new Set([
   NodeSubtypeExpiry,
 ])
 
-// checkDeletable holds a claim to R-DSTRUCT: four contribution subtypes schedule no
+// checkDeletable holds a claim to `R-DSTRUCT`: four contribution subtypes schedule no
 // removal of their own, each being what another rule reads — a contributor's pubkey
-// (V-SIG), the chain to the initial table (V-ARCHIVE), a gap's explanation (R-DGAP), a
-// key's window (R-DEXPIRY). Every other subtype is open vocabulary (V-TYPE), so any
-// other claim may.
+// (`V-SIG`), the chain to the initial table (`V-ARCHIVE`), a gap's explanation
+// (`R-DGAP`), a key's window (`R-DEXPIRY`). Every other subtype is open vocabulary
+// (`V-TYPE`), so any other claim may.
 function checkDeletable(
   typeClass: string,
   typeSub: string,
@@ -500,7 +502,7 @@ export function normalizeCreatedAt(at: string | Date | undefined): string {
   return `${ms.slice(0, -1)}000000Z`
 }
 
-/** heightOf is 1 + the highest height among refs, and 0 with none (§4.1). */
+/** heightOf is 1 + the highest height among refs, and 0 with none (§4.1, `V-HEIGHT`). */
 export function heightOf(...refs: readonly Claim[]): number {
   if (refs.length === 0) return 0
   return 1 + refs.reduce((max, c) => (c.height > max ? c.height : max), 0)

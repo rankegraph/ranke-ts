@@ -114,7 +114,7 @@ func main() {
 				`"form":"original","encoding":"cbor","content":{"max":4096,"overflow":"cutoff"}}}`,
 		},
 		{"a zero content cap", `{"select":{"branch":"main"},"output":{"content":{"max":0,"overflow":"omit"}}}`},
-		// An absent overflow is omit (R-QCONTENT), so a cap alone is a whole pair.
+		// An absent overflow is omit (`R-QCONTENT`), so a cap alone is a whole pair.
 		{"a content cap with no overflow rule", `{"select":{"branch":"main"},"output":{"content":{"max":10}}}`},
 		{
 			"order, limit and execution",
@@ -126,7 +126,7 @@ func main() {
 		{"a fractional duration", `{"select":{"branch":"main"},"limit":{"time":"1.5s"}}`},
 		{"results 0 means unbounded", `{"select":{"branch":"main"},"limit":{"results":0}}`},
 		{"a scan may ask for shape single", `{"select":{"branch":"main"},"output":{"shape":"single"}}`},
-		// A path-less claim anchors the frontier the closure is taken from (R-QANCHOR),
+		// A path-less claim anchors the frontier the closure is taken from (`R-QANCHOR`),
 		// so it is a read of what one claim reaches rather than a traversal with no start.
 		{
 			"a path-less claim anchors the frontier",
@@ -155,14 +155,14 @@ func main() {
 		{"an unknown shape", `{"select":{"branch":"main"},"output":{"shape":"tree"}}`},
 		{"an unknown detail", `{"select":{"branch":"main"},"output":{"detail":"everything"}}`},
 		// "graph" asked for the closed graph, a claim cut down to the edges among the
-		// results, and left the vocabulary when R-QDETAIL settled on id or claims.
+		// results, and left the vocabulary when `R-QDETAIL` settled on id or claims.
 		{"the retired graph detail", `{"select":{"branch":"main"},"output":{"detail":"graph"}}`},
 		{"an unknown form", `{"select":{"branch":"main"},"output":{"form":"resolved"}}`},
 		{"the native encoding, which only a Go caller may set", `{"select":{"branch":"main"},"output":{"encoding":"native"}}`},
 		{"an unknown encoding", `{"select":{"branch":"main"},"output":{"encoding":"yaml"}}`},
 		{"an unknown overflow rule", `{"select":{"branch":"main"},"output":{"content":{"max":10,"overflow":"wrap"}}}`},
 		// "reference" left the vocabulary: it stood in for content a claim had, where
-		// R-QCONTENT now has a claim keep every field either way.
+		// `R-QCONTENT` now has a claim keep every field either way.
 		{"the retired reference overflow", `{"select":{"branch":"main"},"output":{"content":{"max":10,"overflow":"reference"}}}`},
 		{"max 0 inlines content in full", `{"select":{"branch":"main"},"output":{"content":{"max":0,"overflow":"omit"}}}`},
 		{"an unknown collation", `{"select":{"branch":"main"},"order":[{"field":"a","compare":"natural"}]}`},

@@ -1,6 +1,6 @@
 // package: ranke / taxonomy
 // type:    logic
-// job:     V-TIME for the optional timestamp fields — delete_by, pubkey_valid_from,
+// job:     `V-TIME` for the optional timestamp fields — delete_by, pubkey_valid_from,
 // pubkey_expires_after — refused at every door a claim arrives through; created_at is a
 // record slot of its own, which the codec parses
 // limits:  the form of one value, so an absent field is no violation and no timestamp is
@@ -13,7 +13,7 @@
 import { FieldDeleteBy, FieldPubkeyExpiresAfter, FieldPubkeyValidFrom } from './field_taxonomy.ts'
 
 /**
- * timeFields are the optional fields V-TIME governs. created_at is absent: it is its
+ * timeFields are the optional fields `V-TIME` governs. created_at is absent: it is its
  * own record slot rather than a field, and the codec parses it there.
  */
 export const timeFields: readonly string[] = [
@@ -22,12 +22,12 @@ export const timeFields: readonly string[] = [
   FieldPubkeyExpiresAfter,
 ]
 
-// The single form V-TIME admits: RFC 3339, UTC, fixed-width nanoseconds. Fixed width is
+// The single form `V-TIME` admits: RFC 3339, UTC, fixed-width nanoseconds. Fixed width is
 // what keeps S(v) byte-stable, so every implementation writes the one representation.
 const rfc3339Nano = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.\d{9}Z$/
 
 /**
- * validRFC3339Nano reports whether s is a timestamp V-TIME admits: the canonical form,
+ * validRFC3339Nano reports whether s is a timestamp `V-TIME` admits: the canonical form,
  * naming a moment that exists. ranke-go's time.Parse ranges every component, so
  * 2026-02-30 and hour 24 are refused there and here.
  */

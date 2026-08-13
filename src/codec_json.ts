@@ -88,7 +88,7 @@ function decodeEdgeJSON(w: WireEdge): Edge {
   })
 }
 
-// wireFields holds a JSON record's fields to V-TIME, the projection being a door a claim
+// wireFields holds a JSON record's fields to `V-TIME`, the projection being a door a claim
 // arrives through as much as the CBOR form is.
 function wireFields(f: Record<string, string> | undefined): Readonly<Record<string, string>> {
   const out = { ...(f ?? {}) }

@@ -41,7 +41,7 @@ export interface Provenance {
 
 /**
  * Capped is one claim as a read serves it under an `output.content` option
- * (R-QCONTENT) — the bytes a client actually receives when a query caps content, which
+ * (`R-QCONTENT`) — the bytes a client actually receives when a query caps content, which
  * `EncodeCBOR` alone never produces.
  */
 export interface Capped {
@@ -97,7 +97,7 @@ export const provenance: Provenance = file.provenance
 
 export const all: readonly Fixture[] = file.fixtures
 
-/** capped holds the source claim served under each content option R-QCONTENT admits. */
+/** capped holds the source claim served under each content option `R-QCONTENT` admits. */
 export const capped: readonly Capped[] = file.capped
 
 /** refusals holds records ranke-go's decode rejects, each with the reason it gave. */

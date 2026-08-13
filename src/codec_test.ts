@@ -12,7 +12,7 @@ import * as fx from './testing/fixtures.ts'
 // reference implementation, so these are the specification of a decode: the CBOR
 // path and the JSON path must both arrive at the claim it produced.
 
-// A timestamp in the one form V-TIME admits, for the JSON records built by hand here.
+// A timestamp in the one form `V-TIME` admits, for the JSON records built by hand here.
 const AT = '2026-01-01T00:00:00.000000000Z'
 
 // The fixtures must trace to a version, so that a regeneration part-way through a
@@ -240,13 +240,13 @@ test('decodeClaimJSON refuses a record missing its type or timestamp', () => {
   )
 })
 
-// V-TIME fixes one representation, so a timestamp a lax reader would take is refused:
+// `V-TIME` fixes one representation, so a timestamp a lax reader would take is refused:
 // otherwise two implementations disagree on what a claim says while both read it.
 test('decodeClaimJSON refuses a created_at outside the one form', () => {
   for (const at of [
     '2026-01-01T00:00:00Z', // no fraction
     '2026-01-01T00:00:00.000Z', // milliseconds, not nanoseconds
-    '2026-01-01T00:00:00.000000000+01:00', // an offset, where V-TIME fixes UTC
+    '2026-01-01T00:00:00.000000000+01:00', // an offset, where `V-TIME` fixes UTC
     '2026-01-01', // a date alone
     '2026-02-30T00:00:00.000000000Z', // a day February does not have
     '2026-01-01T24:00:00.000000000Z', // an hour a day does not have

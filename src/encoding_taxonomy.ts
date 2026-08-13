@@ -235,7 +235,7 @@ const encodingSubFromAliasMap: ReadonlyMap<EncodingSubtype, EncodingSubtype> = n
 
 /**
  * encodingSubToAlias / encodingSubFromAlias convert well-known subtypes to and from
- * their bare compact alias; unknown values pass through unchanged.
+ * their bare compact alias (`V-ALIAS`); unknown values pass through unchanged.
  */
 export function encodingSubToAlias(s: string): string {
   return encodingSubAliases.get(s) ?? s

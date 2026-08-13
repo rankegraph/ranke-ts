@@ -4,7 +4,7 @@
 
 .PHONY: all install test typecheck build clean testdata-clean verify release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
-	major minor patch breaking feature fix
+	rule-citations major minor patch breaking feature fix
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -68,9 +68,20 @@ clean:
 testdata-clean:
 	rm -rf testdata
 
+# Every rule id a comment cites is one the spec declares, and every declared rule is
+# cited or listed in scripts/rule-citations.allow with a reason. It says nothing about
+# whether a citation is TRUE — a text comparison cannot. Needs the spec, so `make docs`
+# first; against a copy of your own:
+#   make rule-citations RANKE_SPEC=path/to/spec.typ
+rule-citations:
+	@./scripts/rule-citations.sh
+
 # The gate a release must pass. ranke-go splits the fast checks from its full
 # suite; here the whole lot runs in under a second, so `verify` is `all`.
-verify: typecheck test build
+#
+# Needs the spec: rule-citations reads $(PAPERS_DIR), which is gitignored, so a bare
+# checkout fails the gate rather than passing it blind.
+verify: typecheck test build rule-citations
 
 # The version, which is the latest release tag: package.json carries 0.0.0 in the tree
 # and the release workflow stamps the tag's number in just before publishing. `--match`

@@ -97,7 +97,7 @@ test('the read-time scan rule is caught before sending', () => {
   ValidateQuery({ select: { branch: 'main', path: [{}] }, output: { shape: 'path' } })
 })
 
-// A path-less claim anchors the frontier the closure is taken from (R-QANCHOR), so it is
+// A path-less claim anchors the frontier the closure is taken from (`R-QANCHOR`), so it is
 // a read of what one claim reaches. ranke-go once refused it as a traversal with no
 // start, and this library inherited that; the case keeps the refusal from returning.
 test('a path-less claim is a legal read', () => {

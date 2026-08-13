@@ -70,7 +70,7 @@ export class RankeQueryError extends Error {
 const DIRS = ['provenance', 'uses', 'connections'] as const
 const SHAPES = ['single', 'path'] as const
 // "graph" asked for the closed graph, a claim cut down to the edges among the results,
-// so R-QDETAIL dropped it: id or claims.
+// so `R-QDETAIL` dropped it: id or claims.
 const DETAILS = ['id', 'claims'] as const
 const FORMS = ['original', 'materialized'] as const
 // Three values the schema excludes because only a Go caller may set them: the native
@@ -104,7 +104,7 @@ const KEYS = {
 
 /**
  * ValidateQuery holds a query to the schema's rules plus the two it cannot state:
- * a step's min against its max (R-QSTEPS), and what a scan may ask for.
+ * a step's min against its max (`R-QSTEPS`), and what a scan may ask for.
  *
  * The types already refuse a bad enum at compile time, so this earns its keep on a
  * query assembled at run time — from a form, a URL, or stored state.
@@ -186,9 +186,11 @@ function validateSelect(q: Query): void {
   checkString('select.head', sel.head)
   checkString('select.claim', sel.claim)
   checkArray('select.path', sel.path)
+  // `R-QSCOPE`: the scope is mandatory and an empty branch is refused.
   if (sel.branch === undefined || sel.branch === '') {
     throw new RankeQueryError('ErrQueryNoScope', 'select.branch', 'a scope is mandatory')
   }
+  // `R-QHEAD`: required under $universe, optional under every other scope.
   if (sel.branch === '$universe' && sel.head === undefined) {
     throw new RankeQueryError(
       'ErrQueryNoHead',
@@ -205,7 +207,7 @@ function validateSelect(q: Query): void {
   if (path.length > 0) return
 
   // A scan. A path-less `claim` stands: it anchors the frontier the closure is taken
-  // from (R-QANCHOR), which is a route of its own.
+  // from (`R-QANCHOR`), which is a route of its own.
   if (q.output?.shape === 'path') {
     throw new RankeQueryError(
       'ErrQueryScanShape',
@@ -333,7 +335,7 @@ function validateOutput(o: Output): void {
   checkObject('output.content', o.content, KEYS.content)
   checkInt('output.content.max', o.content.max)
   checkString('output.content.overflow', o.content.overflow)
-  // An absent overflow is omit (R-QCONTENT), so a cap alone is a whole content pair.
+  // An absent overflow is omit (`R-QCONTENT`), so a cap alone is a whole content pair.
   oneOf('output.content.overflow', o.content.overflow, OVERFLOWS)
   // A byte cap is a count, which the schema bounds at zero.
   if (o.content.max === undefined || o.content.max < 0) {

@@ -1,0 +1,69 @@
+# Rules the spec declares that no comment in this library cites — the ratchet half of
+# scripts/rule-citations.sh. One rule per line: the id, then a reason.
+#
+# THE LIST MAY ONLY SHRINK. Cite a rule and its line goes; the script fails on a listed
+# rule that has since been cited, so the list cannot rot into a permanent exemption that
+# silences the "uncited and unlisted" failure. It started at 45 entries; citing the rules
+# this library actually enforces took 16 of them in the same change, which is the
+# mechanism working.
+#
+# What a reason says, and it says one of these three:
+#
+#   another layer's  — the rule governs something this library never does. It stands as
+#                      long as that holds.
+#   citation owed    — this library enforces the rule and no comment says so. The line
+#                      names the site, so the citation lands where the rule is enforced
+#                      rather than anywhere convenient.
+#   nothing to cite  — the rule is unimplemented here, so there is no site. The line goes
+#                      when the check does, not before.
+#
+# A reason that says only "not yet" says none of that: it neither justifies the exemption
+# nor names what removes it.
+#
+# This library's scope is the reason most lines read "another layer's": it reads claims a
+# server served, builds claims, and builds queries. No key material, no storage, no diff
+# materialisation, no query execution — see README.md.
+
+# Access — accounts, targets, and the letters they hold. Grants are the server's
+# configuration, resolved long before a claim or a query reaches a browser.
+R-AGRANT       another layer's: grants and accounts are the server's configuration
+R-ABRANCH      another layer's: per-branch rights are checked before a read is served
+R-ATABLE       another layer's: rights over $branches are the server's to check
+R-AUNIVERSE    another layer's: the privileged $universe read is the server's to grant
+
+# Contribution — the six-step procedure, all of it a Sequencer's. This library builds a
+# claim and stops; what happens to it afterwards is RankeDB's.
+R-C1BASE       another layer's: the base (k, t) is taken by the Sequencer
+R-C2DATE       another layer's: dating a claim against the base time needs the base
+R-C2TYPE       another layer's: the reserved types are the Sequencer's to refuse at merge
+R-C3CLOSE      another layer's: closing over references needs the store
+R-C3LIMIT      another layer's: which claims a branch holds is the store's
+R-C4KEY        another layer's: a key's window is verification's, and no key enters here
+R-C4SEAL       another layer's: sealing a contribution is the Sequencer's
+R-C5PERSIST    another layer's: durable storage before a merge
+R-C6MERGE      another layer's: the Sequencer contributes the branch table
+R-C6REQUEST    another layer's: a request becomes its limiting claim at merge
+R-C6SIGN       another layer's: the Sequencer's own identity on the claims it creates
+
+# Deletion — the requested form, which the Sequencer documents and carries out.
+R-DREQUEST     another layer's: the contribution/delete claim is the Sequencer's to create
+
+# RQL — this library sends a query and reads the results. Which claims come back, and in
+# what order, is the engine's.
+R-QEVAL        another layer's: the evaluation order is the engine's
+R-QFORM        another layer's: resolving a diff chain is the server's; only the axis is sent
+R-QFRONTIER    another layer's: frontier membership is decided by the walk
+R-QSORT        another layer's: the sort runs where the result set does
+R-QLIMIT       another layer's: bounding a read is the engine's; the duration grammar is the schema's
+R-QLAYER       another layer's: only the engine that pins a layer can reject a name
+
+# Translation to Cypher — the graph backend's own chapter.
+R-QCYPHER      another layer's: the translation answers what the native engine does
+R-QCCLAUSE     another layer's: block-by-block clause mapping, a backend's
+R-QCSTEP       another layer's: a step as a variable-length segment, a backend's
+R-QCFRONTIER   another layer's: one MATCH per step, a backend's
+R-QCSCOPE      another layer's: the confined set equals the scope, a backend's
+
+# ADT rules needing a graph rather than a record.
+V-TABLEREF     another layer's: who may reference a branch table is read off the closure
+V-MONO         nothing to cite: no verification here, and ranke-go leaves it unenforced too (its sd-334cf7)

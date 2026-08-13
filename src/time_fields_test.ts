@@ -4,7 +4,7 @@ import test from 'node:test'
 import { FieldDeleteBy, FieldPubkeyExpiresAfter, FieldPubkeyValidFrom } from './field_taxonomy.ts'
 import { checkTimestampFields, timeFields, validRFC3339Nano } from './time_fields.ts'
 
-// V-TIME governs delete_by and the two pubkey bounds as well as created_at. ranke-go
+// `V-TIME` governs delete_by and the two pubkey bounds as well as created_at. ranke-go
 // mirrors these in verify_time_test.go, where the same three fields went unparsed:
 // delete_by was compared for equality and copied as a string, and a pubkey bound was
 // parsed only as a side effect of signing something.
@@ -35,7 +35,7 @@ test('validRFC3339Nano refuses everything else', () => {
     '2026-01-02T03:04:05Z', // no fraction
     '2026-01-02T03:04:05.123Z', // milliseconds
     '2026-01-02T03:04:05.1234567890Z', // ten digits
-    '2026-01-02T03:04:05.123456789+00:00', // an offset, where V-TIME fixes UTC
+    '2026-01-02T03:04:05.123456789+00:00', // an offset, where `V-TIME` fixes UTC
     '2026-01-02T03:04:05.123456789z', // a lowercase zone
     '2026-01-02 03:04:05.123456789Z', // a space for the T
     '2026-01-02',

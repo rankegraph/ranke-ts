@@ -69,7 +69,7 @@ export const NodeTypeHead = `${NodeClassContribution}/${NodeSubtypeHead}`
 export const NodeTypeBranches = `${NodeClassContribution}/${NodeSubtypeBranches}`
 
 /**
- * nodeClassToAlias maps a canonical node class to its single-char alias;
+ * nodeClassToAlias maps a canonical node class to its single-char alias (`V-ALIAS`);
  * unknown / already-aliased values pass through unchanged.
  */
 export function nodeClassToAlias(c: string): string {

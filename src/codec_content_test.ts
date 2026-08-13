@@ -5,7 +5,7 @@ import { decodeClaim } from './codec.ts'
 import { contentComplete, contentHeld, contentSize, inlineBytes } from './content.ts'
 import { type Capped, capped, cborBytes } from './testing/fixtures.ts'
 
-// A read may cap the content it inlines (R-QCONTENT), so a client receives claims whose
+// A read may cap the content it inlines (`R-QCONTENT`), so a client receives claims whose
 // content is partial or absent while content_size still states the true length. The bytes
 // come from ranke-go's query encoder, the reference for that rule.
 
@@ -16,7 +16,7 @@ function find(label: string): Capped {
 }
 
 test('every content option ranke-go serves decodes', () => {
-  assert.ok(capped.length >= 6, 'the generator covers each option R-QCONTENT admits')
+  assert.ok(capped.length >= 6, 'the generator covers each option `R-QCONTENT` admits')
   for (const c of capped) {
     const claim = decodeClaim(cborBytes(c), c.id)
     assert.equal(contentHeld(claim.content), c.inline, `${c.label}: bytes held`)
@@ -56,6 +56,8 @@ test('contentComplete tells a prefix from the whole content', () => {
   }
 })
 
+// `R-QCANON`: content in full is the only output form a client can hash and check
+// against the id, since those are the bytes S(v) the id was computed over.
 test('content in full is the record whose hash is the id', () => {
   const full = find('max 0, content in full')
   const claim = decodeClaim(cborBytes(full), full.id)
@@ -88,7 +90,7 @@ test('cutoff delivers a prefix of the content, omit none of the value', () => {
   assert.equal(contentHeld(decodeClaim(cborBytes(omitted), omitted.id).content), 0)
 })
 
-// An absent overflow is omit (R-QCONTENT), so the two must serve the same bytes.
+// An absent overflow is omit (`R-QCONTENT`), so the two must serve the same bytes.
 test('an absent overflow serves what omit serves', () => {
   assert.equal(find('an absent overflow, which is omit').cbor,
     find('a cap the content overruns, omitted whole').cbor)
@@ -101,7 +103,7 @@ test('a cap the content fits leaves it whole', () => {
     'a cap nothing overruns serves the record in full')
 })
 
-// The JSON projection carries the same information (R-QENCODING), so its content field
+// The JSON projection carries the same information (`R-QENCODING`), so its content field
 // must follow the cap exactly as the CBOR record does.
 test('the JSON projection caps content alike', () => {
   for (const c of capped) {

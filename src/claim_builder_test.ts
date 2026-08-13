@@ -421,9 +421,9 @@ test('a relation edge states its direction, and nothing else may', () => {
   newEdge({ reference: fx.ids.source!, type: 'relation/family', relationDirection: -1 })
 })
 
-// R-DSTRUCT names four subtypes, each being what another rule reads: a contributor's
-// pubkey (V-SIG), the chain to the initial table (V-ARCHIVE), a gap's explanation
-// (R-DGAP), a key's window (R-DEXPIRY).
+// `R-DSTRUCT` names four subtypes, each being what another rule reads: a contributor's
+// pubkey (`V-SIG`), the chain to the initial table (`V-ARCHIVE`), a gap's explanation
+// (`R-DGAP`), a key's window (`R-DEXPIRY`).
 test('the four structural subtypes take no delete_by', () => {
   for (const sub of ['contributor', 'branches', 'delete', 'expiry']) {
     assert.throws(
@@ -441,9 +441,9 @@ test('the four structural subtypes take no delete_by', () => {
   }
 })
 
-// The bound on the rule above: a contribution subtype is open vocabulary (V-TYPE), so
+// The bound on the rule above: a contribution subtype is open vocabulary (`V-TYPE`), so
 // an application's own may schedule its removal like any other claim. Refusing by class
-// made every contribution/* undeletable, which R-DSTRUCT does not say.
+// made every contribution/* undeletable, which `R-DSTRUCT` does not say.
 test('an open contribution subtype may schedule its deletion', () => {
   const built = newClaim({
     type: 'contribution/annotation',
@@ -455,7 +455,7 @@ test('an open contribution subtype may schedule its deletion', () => {
   assert.equal(built.claim.fields.delete_by, '2030-01-01T00:00:00.000000000Z')
 })
 
-// R-DPLANNED: the target's schedule travels with the reference, so an edge takes it from
+// `R-DPLANNED`: the target's schedule travels with the reference, so an edge takes it from
 // the claim it names.
 test('an edge carries its target delete_by', () => {
   const contributor = root()

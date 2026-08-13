@@ -97,7 +97,7 @@ func refuse(label string, c ranke.Claim) refusal {
 	return refusal{Label: label, CBOR: hex.EncodeToString(raw), Error: err.Error()}
 }
 
-// serve runs a claim through the query encoder, which is what applies R-QCONTENT, and
+// serve runs a claim through the query encoder, which is what applies `R-QCONTENT`, and
 // returns the record a read would deliver in each encoding.
 func serve(c ranke.Claim, oc *ranke.OutputContent, enc ranke.ResultEncoding) []byte {
 	results := []ranke.QueryResult{{Kind: ranke.KindClaimNative, ClaimNative: c}}
@@ -306,7 +306,7 @@ func main() {
 		out.Fixtures = append(out.Fixtures, f)
 	}
 
-	// The same claim served under each content option R-QCONTENT admits. src carries
+	// The same claim served under each content option `R-QCONTENT` admits. src carries
 	// inline content, so every option shows on it.
 	srcInline, err := src.Node().GetInlineContent()
 	must(err)
