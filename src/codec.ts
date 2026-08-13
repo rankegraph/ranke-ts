@@ -22,6 +22,7 @@ import {
   nodeSubtypeFromAlias,
   nodeSubtypeToAlias,
 } from './node_taxonomy.ts'
+import { checkTimestampFields, validRFC3339Nano } from './time_fields.ts'
 import {
   CborReader,
   CborWriter,
@@ -37,12 +38,12 @@ export class RankeDecodeError extends Error {
 }
 
 // The claim file wraps the node record under key 1, and the node record's own keys are
-// the ones V-SER fixes. A key absent means its zero value: the encoder drops an empty
+// the ones `V-SER` fixes. A key absent means its zero value: the encoder drops an empty
 // string, an empty collection and a zero number.
 const CLAIM_NODE = 1
 
 // Keys 1 to 8 are the slots a node and an edge share, so one number means one thing in
-// either record. A node then takes 9 to 11 and an edge 12 to 13 (V-SER).
+// either record. A node then takes 9 to 11 and an edge 12 to 13 (`V-SER`).
 const SHARED_TYPE_CLASS = 1
 const SHARED_TYPE_SUB = 2
 const SHARED_ENCODING_CLASS = 3
@@ -104,8 +105,9 @@ export function decodeClaim(bytes: Uint8Array, id = '', opts: DecodeOptions = {}
 }
 
 /**
- * nodePreimage extracts S(node) — key 1 — from a claim's stored bytes, the exact
- * bytes an id was signed over. Verification hashes these and never a re-encode.
+ * nodePreimage extracts S(node) — key 1 — from a claim's stored bytes, the exact bytes
+ * an id was signed over. Checking an id against them is `V-ID`, which is why it hashes
+ * these and never a re-encode.
  */
 export function nodePreimage(bytes: Uint8Array): Uint8Array {
   const r = new CborReader(bytes)
@@ -189,7 +191,12 @@ function bytes(raw: Uint8Array | undefined): Uint8Array | null {
 }
 
 function fields(raw: Uint8Array | undefined): Readonly<Record<string, string>> {
-  return Object.freeze(raw === undefined ? {} : readTextMap(raw))
+  const out = raw === undefined ? {} : readTextMap(raw)
+  // `V-TIME` covers delete_by and the two pubkey bounds as well as created_at. Read at
+  // the door, since a record that arrived as bytes meets no other parser.
+  const bad = checkTimestampFields(out)
+  if (bad !== null) throw new RankeDecodeError(`a timestamp is not RFC 3339 nanoseconds: ${bad}`)
+  return Object.freeze(out)
 }
 
 // content resolves the three-way declaration: inline bytes, an external address, or
@@ -216,7 +223,7 @@ function content(
     })
   }
   // A size with neither the bytes nor an address: content the record declares and does
-  // not carry, which a read cutting content to nothing delivers (R-QCONTENT). It holds
+  // not carry, which a read cutting content to nothing delivers (`R-QCONTENT`). It holds
   // an empty run of bytes rather than none, so a reader compares lengths as ever.
   if (size > 0) return Object.freeze({ kind: 'inline', bytes: new Uint8Array(0), size, encoding })
   return contentNone
@@ -398,13 +405,15 @@ function contentFromRef(ref: ContentRef | undefined): ContentRef {
 }
 
 /**
- * parseCreatedAt returns epoch milliseconds for an RFC 3339 timestamp, dropping any
- * precision past the millisecond — which is why claim.createdAt keeps the string.
+ * parseCreatedAt returns epoch milliseconds for a created_at in the one form `V-TIME`
+ * admits, dropping precision past the millisecond — which is why claim.createdAt keeps
+ * the string.
  */
 export function parseCreatedAt(s: string): number {
-  const ms = Date.parse(s)
-  if (Number.isNaN(ms)) throw new RankeDecodeError(`created_at is not RFC 3339: ${s}`)
-  return ms
+  if (!validRFC3339Nano(s)) {
+    throw new RankeDecodeError(`created_at is not RFC 3339 nanoseconds in UTC: ${s}`)
+  }
+  return Date.parse(s)
 }
 
 // ─── Encoding: the canonical bytes an id is computed over ─────────────

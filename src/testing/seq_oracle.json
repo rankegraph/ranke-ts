@@ -1,6 +1,6 @@
 {
   "note": "Framed result sequences as RankeDB serves them, one per payload kind and encoding. Every payload is encoded by ranke-go: a JSON record in a CBOR sequence would mis-decode, so each framing carries its own form.",
-  "rankeGo": "v0.19.0",
+  "rankeGo": "v0.19.1",
   "streams": [
     {
       "label": "claims",

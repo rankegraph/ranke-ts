@@ -83,7 +83,7 @@ test('algorithm names the scheme', () => {
 })
 
 // eddsa (0xd0ed) is three varint bytes, where the ed25519-pub it replaced was two.
-// A reader stopping short mis-frames every signature (V-SIGN).
+// A reader stopping short mis-frames every signature (`V-SIGN`).
 test('a signature id carries the eddsa varint', () => {
   const raw = parseId(goSignatureId).rawBytes()
   assert.deepEqual(

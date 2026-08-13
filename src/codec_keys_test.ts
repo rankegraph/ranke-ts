@@ -4,7 +4,7 @@ import test from 'node:test'
 import { type EdgeRecord, type NodeRecord, encodeEdge, encodeNodeWithEdges } from './codec.ts'
 import { CborReader } from './internal/cbor.ts'
 
-// The numeric keys V-SER fixes, read off the encoded bytes rather than off the constants
+// The numeric keys `V-SER` fixes, read off the encoded bytes rather than off the constants
 // that produced them: a mis-transcribed table round-trips against itself happily.
 // Inline content and a content_hash are exclusive (§Content), so covering all eight
 // shared keys takes one record of each kind.
@@ -70,13 +70,13 @@ const sorted = (keys: Iterable<number>) => [...keys].sort((a, b) => a - b)
 const node = (n: NodeRecord) => keysOf(encodeNodeWithEdges(n, [encodeEdge(inlineEdge)]))
 const edge = (e: EdgeRecord) => keysOf(encodeEdge(e))
 
-test('a node record serializes under the keys V-SER fixes', () => {
+test('a node record serializes under the keys `V-SER` fixes', () => {
   const want = (omit: number) => sorted([...SHARED.filter((k) => k !== omit), ...NODE_OWN])
   assert.deepEqual(sorted(node(inlineNode).keys()), want(CONTENT_HASH), 'inline content')
   assert.deepEqual(sorted(node(externalNode).keys()), want(CONTENT), 'external content')
 })
 
-test('an edge record serializes under the keys V-SER fixes', () => {
+test('an edge record serializes under the keys `V-SER` fixes', () => {
   const want = (omit: number) => sorted([...SHARED.filter((k) => k !== omit), ...EDGE_OWN])
   assert.deepEqual(sorted(edge(inlineEdge).keys()), want(CONTENT_HASH), 'inline content')
   assert.deepEqual(sorted(edge(externalEdge).keys()), want(CONTENT), 'external content')

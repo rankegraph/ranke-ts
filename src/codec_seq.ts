@@ -20,8 +20,9 @@ import { CborReader } from './internal/cbor.ts'
 export type SeqEncoding = 'cbor' | 'json'
 
 /**
- * QueryReport trails a stream when execution.report was set. A duration carries its
- * unit in the name, being a bare integer of nanoseconds.
+ * QueryReport trails a stream when execution.report was set (`R-QREPORT`). A duration
+ * carries its unit in the name, being a bare integer of nanoseconds; those names are the
+ * read contract, and a field beyond them is the server's to define.
  */
 export interface QueryReport {
   readonly started_at?: string
@@ -44,8 +45,10 @@ export interface QueryEvent {
 
 /**
  * ResultRecord is one record of a result run, tagged by what it carries — the kinds of
- * ranke-go's ResultKind. A path of CLAIMS arrives as one record per claim, so `claim`
- * covers both shapes and a caller counts a route out for itself.
+ * ranke-go's ResultKind. The tag is `R-QSTREAM`'s: a reader learns what an element holds
+ * without inspecting the payload. An endpoint and a route are the two `R-QSHAPE` fixes,
+ * and a path of CLAIMS arrives as one record per claim, so `claim` covers both shapes
+ * and a caller counts a route out for itself.
  */
 export type ResultRecord =
   | { readonly kind: 'claim'; readonly claim: Claim }

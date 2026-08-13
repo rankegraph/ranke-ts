@@ -29,3 +29,13 @@ jobs:
 
       - name: Build
         run: make build
+
+      # The spec the rule-citation gate reads lives in ranke-graph, so it is
+      # infrastructure: fetched, never skipped. The gate fails without it rather than
+      # passing blind.
+      - name: Fetch the spec
+        run: make docs
+
+      # Every rule id a comment cites is one the spec declares. Needs the spec above.
+      - name: Rule citations
+        run: make rule-citations

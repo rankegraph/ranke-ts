@@ -25,7 +25,7 @@ export type ContentRef =
       readonly kind: 'inline'
       /**
        * What this record holds, which a capped read may cut to a prefix or to nothing
-       * (R-QCONTENT). Compare its length against `size` — see contentComplete.
+       * (`R-QCONTENT`). Compare its length against `size` — see contentComplete.
        */
       readonly bytes: Uint8Array
       /** The content's full length, whatever `bytes` holds of it. */
@@ -75,7 +75,7 @@ export function contentHeld(c: ContentRef): number {
 
 /**
  * contentComplete reports whether the record holds every byte it declares. A capped read
- * (R-QCONTENT) serves a prefix, which kind and size alone cannot distinguish from whole
+ * (`R-QCONTENT`) serves a prefix, which kind and size alone cannot distinguish from whole
  * content. External content is complete only once fetched; no content, trivially.
  */
 export function contentComplete(c: ContentRef): boolean {

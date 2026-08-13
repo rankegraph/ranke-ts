@@ -6,8 +6,7 @@
 // already-stored record (-> claim)
 
 /**
- * Field-size caps for the reference implementation; fields are metadata, so large
- * data belongs in content.
+ * Field-size caps (`R-FIELDS`); fields are metadata, so large data belongs in content.
  */
 export const maxFieldNameLen = 128 // bytes, one field name
 export const maxFieldValueLen = 64 * 1024 // bytes, one field value
@@ -15,7 +14,7 @@ export const maxFieldsPerRecord = 256 // fields on one node or edge
 
 /**
  * Field is a node/edge field name: open user vocabulary over [a-z0-9_] with no
- * leading "_". Charsets outside that are reserved system namespaces, e.g. ".".
+ * leading "_" (`R-FIELDS`). Charsets outside that are reserved system namespaces, e.g. ".".
  */
 export type Field = string
 
@@ -114,8 +113,8 @@ export function validEncodingSubtype(sub: string): boolean {
 }
 
 /**
- * fieldNameToAlias maps a well-known field name to its bare alias; user names pass
- * through.
+ * fieldNameToAlias maps a well-known field name to its bare alias (`V-ALIAS`); user
+ * names pass through.
  */
 export function fieldNameToAlias(n: string): string {
   switch (n) {

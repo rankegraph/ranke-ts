@@ -98,7 +98,7 @@ export function edgeClassFromAlias(c: string): string {
 
 /**
  * edgeSubtypeToAlias / edgeSubtypeFromAlias convert the closed contribution/* edge
- * subtypes; open-vocabulary subtypes pass through unchanged.
+ * subtypes (`V-ALIAS`); open-vocabulary subtypes pass through unchanged.
  */
 export function edgeSubtypeToAlias(s: string): string {
   switch (s) {

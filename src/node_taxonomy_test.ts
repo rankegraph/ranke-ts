@@ -12,16 +12,12 @@ import {
   NodeClassRelationAlias,
   NodeClassSource,
   NodeClassSourceAlias,
-  NodeSubtypeBranch,
-  NodeSubtypeBranchAlias,
   NodeSubtypeBranches,
   NodeSubtypeBranchesAlias,
   NodeSubtypeContributor,
   NodeSubtypeContributorAlias,
   NodeSubtypeDelete,
   NodeSubtypeDeleteAlias,
-  NodeSubtypeDiff,
-  NodeSubtypeDiffAlias,
   NodeSubtypeExpiry,
   NodeSubtypeExpiryAlias,
   NodeSubtypeHead,
@@ -32,7 +28,14 @@ import {
   nodeSubtypeToAlias,
   validNodeClass,
 } from './node_taxonomy.ts'
-import { EdgeSubtypeDelete, EdgeSubtypeExpiry, edgeSubtypeToAlias } from './edge_taxonomy.ts'
+import {
+  EdgeSubtypeBranch,
+  EdgeSubtypeBranchAlias,
+  EdgeSubtypeDiff,
+  EdgeSubtypeDiffAlias,
+  edgeSubtypeFromAlias,
+  edgeSubtypeToAlias,
+} from './edge_taxonomy.ts'
 import { checkAliasRoundTrip, checkSingleCharacter } from './testing/alias_check.ts'
 
 // Foundation unit tests for the node wire aliases (§5.1). To optimise encoding size
@@ -59,9 +62,7 @@ test('node subtype aliases', () => {
   checkAliasRoundTrip(
     new Map([
       [NodeSubtypeContributor, NodeSubtypeContributorAlias],
-      [NodeSubtypeBranch, NodeSubtypeBranchAlias],
       [NodeSubtypeBranches, NodeSubtypeBranchesAlias],
-      [NodeSubtypeDiff, NodeSubtypeDiffAlias],
       [NodeSubtypeHead, NodeSubtypeHeadAlias],
       [NodeSubtypeDelete, NodeSubtypeDeleteAlias],
       [NodeSubtypeExpiry, NodeSubtypeExpiryAlias],
@@ -72,12 +73,42 @@ test('node subtype aliases', () => {
   )
 })
 
-// A limiting claim and the edge naming its target share a type string, so the two
-// alias tables must abbreviate it the same way — otherwise one claim's node and
-// edge disagree on what "delete" is called.
-test('limiting subtypes agree across the node and edge tables', () => {
-  assert.equal(nodeSubtypeToAlias(NodeSubtypeDelete), edgeSubtypeToAlias(EdgeSubtypeDelete))
-  assert.equal(nodeSubtypeToAlias(NodeSubtypeExpiry), edgeSubtypeToAlias(EdgeSubtypeExpiry))
+// @tbl:aliases is ONE "type subtype" column that nodes and edges share, which this
+// library splits across node_taxonomy.ts and edge_taxonomy.ts. Wherever both halves know
+// a name or a letter they must say the same thing, or one claim's node and edge
+// abbreviate the same subtype differently.
+//
+// A subtype only one half knows is legitimate — "branch" and "diff" are edge-only — so
+// the check applies where they overlap. It catches a letter reused for two meanings,
+// which is what splitting one table into two makes possible.
+test('the subtype alias tables agree', () => {
+  // Every subtype either table declares, so a name added to one and forgotten in the
+  // other is still probed here.
+  const names = ['contributor', 'head', 'branches', 'branch', 'diff', 'prune', 'delete', 'expiry']
+  for (const name of names) {
+    const node = nodeSubtypeToAlias(name)
+    const edge = edgeSubtypeToAlias(name)
+    if (node === name || edge === name) continue // one half passes the name through
+    assert.equal(node, edge, `subtype ${JSON.stringify(name)} is abbreviated two ways`)
+  }
+
+  // The same agreement read back: a letter both halves decode must decode alike.
+  for (let c = 'A'.charCodeAt(0); c <= 'z'.charCodeAt(0); c++) {
+    const letter = String.fromCharCode(c)
+    const node = nodeSubtypeFromAlias(letter)
+    const edge = edgeSubtypeFromAlias(letter)
+    if (node === letter || edge === letter) continue
+    assert.equal(node, edge, `alias ${JSON.stringify(letter)} means two things`)
+  }
+})
+
+// Removing the node-side "branch" and "diff" left @tbl:aliases untouched, so the edge
+// side must still hold b and d.
+test('the edge-only subtypes keep their letters', () => {
+  assert.equal(edgeSubtypeToAlias(EdgeSubtypeBranch), 'b')
+  assert.equal(edgeSubtypeToAlias(EdgeSubtypeDiff), 'd')
+  assert.equal(edgeSubtypeFromAlias(EdgeSubtypeBranchAlias), 'branch')
+  assert.equal(edgeSubtypeFromAlias(EdgeSubtypeDiffAlias), 'diff')
 })
 
 test('node aliases are a single character', () => {
@@ -88,9 +119,7 @@ test('node aliases are a single character', () => {
   checkSingleCharacter(
     [
       NodeSubtypeContributor,
-      NodeSubtypeBranch,
       NodeSubtypeBranches,
-      NodeSubtypeDiff,
       NodeSubtypeHead,
       NodeSubtypeDelete,
       NodeSubtypeExpiry,

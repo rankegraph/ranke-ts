@@ -79,7 +79,7 @@ those bytes through unchanged.
 The builder enforces what construction can: the type vocabularies, the
 inline-or-addressed content rule with its mandatory encoding, the §3.5 provenance
 invariant, one contributor edge and one diff edge, named edges on a diff claim,
-the canonical edge order, R-DELBY on an edge whose target is scheduled, and that a
+the canonical edge order, R-DPLANNED on an edge whose target is scheduled, and that a
 claim declaring a key cannot identity-sign.
 
 ## Queries
@@ -229,12 +229,21 @@ Node 22 or newer. Node runs the TypeScript sources directly by stripping types,
 so the tests need no build step.
 
 ```sh
+make docs       # fetch the papers and the spec — run this first
 make install
 make test       # with a floor: node --test exits 0 on an empty glob
 make typecheck  # sources and tests
 make build      # emit dist/ with .d.ts
-make verify     # the three above, as a release must pass them
+make verify     # the four above, as a release must pass them
 ```
+
+`make docs` comes first because `verify` runs `scripts/rule-citations.sh`, which reads
+the spec from `docs/papers/` — gitignored, so a bare checkout fails the gate rather than
+passing blind. The gate holds every rule id a comment cites to one the spec declares, and
+every declared rule to either a citation or a line in `scripts/rule-citations.allow`
+saying why it has none. It says nothing about whether a citation is *true*; a text
+comparison cannot. `R-DELBY` sat at five sites and `R-QHOPS` at one, each spelled
+consistently and naming no rule at all, which is what the gate exists to catch.
 
 `tsconfig.json` sets `erasableSyntaxOnly`, which holds the source to the subset
 Node can strip: no `enum`, no `namespace`, no parameter properties. String

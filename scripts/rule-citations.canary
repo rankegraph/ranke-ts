@@ -1,0 +1,10 @@
+The canary for scripts/rule-citations.sh.
+
+A citation is a rule id in backticks, so prose reaching for a word shaped like one — a
+V-SHAPED curve, an R-RATED film — is not a citation and must not be reported as an id
+the spec fails to declare. A gate that reads these two as citations is loose enough to
+be edited into a nuisance, and a nuisance gate gets switched off.
+
+Kept as a plain file rather than a test: ranke-go holds it in a .go source the gate
+reads, and the equivalent here would be a .ts file the compiler and the test runner
+would both pick up.

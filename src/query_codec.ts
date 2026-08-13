@@ -5,8 +5,8 @@
 // limits:  shape only; which claims a read returns is RankeDB's (ranke-go -> query_default.go)
 //
 // Mirrors ranke-go's query_codec.go, minus DecodeQuery: nothing browser-side receives
-// a query, only sends one. The scan rules come from ranke-go's archive.go instead,
-// where a read enforces them — catching them here saves the round trip, which is what
+// a query, only sends one. The scan rule comes from ranke-go's archive.go instead,
+// where a read enforces it — catching it here saves the round trip, which is what
 // a client-side validator is for.
 
 import type {
@@ -29,7 +29,6 @@ export type QueryErrorCode =
   | 'ErrQueryNoScope'
   | 'ErrQueryNoHead'
   | 'ErrQueryScanShape'
-  | 'ErrQueryScanClaim'
   | 'ErrQueryWhereForm'
   | 'ErrQueryComparisonForm'
   | 'ErrQueryHops'
@@ -71,7 +70,7 @@ export class RankeQueryError extends Error {
 const DIRS = ['provenance', 'uses', 'connections'] as const
 const SHAPES = ['single', 'path'] as const
 // "graph" asked for the closed graph, a claim cut down to the edges among the results,
-// so R-QDETAIL dropped it: id or claims.
+// so `R-QDETAIL` dropped it: id or claims.
 const DETAILS = ['id', 'claims'] as const
 const FORMS = ['original', 'materialized'] as const
 // Three values the schema excludes because only a Go caller may set them: the native
@@ -104,8 +103,8 @@ const KEYS = {
 } as const
 
 /**
- * ValidateQuery holds a query to the schema's rules plus the three it cannot state:
- * a step's min against its max (R-QHOPS), and what a scan may ask for.
+ * ValidateQuery holds a query to the schema's rules plus the two it cannot state:
+ * a step's min against its max (`R-QSTEPS`), and what a scan may ask for.
  *
  * The types already refuse a bad enum at compile time, so this earns its keep on a
  * query assembled at run time — from a form, a URL, or stored state.
@@ -175,8 +174,8 @@ function checkTypeGlobs(field: string, v: unknown): void {
   }
 }
 
-// validateSelect checks the generator, including the two rules ranke-go enforces at
-// read time in archive.go: a scan reaches claims by no stated route.
+// validateSelect checks the generator, including the rule ranke-go enforces at read time
+// in archive.go: a scan reaches claims by no stated route.
 function validateSelect(q: Query): void {
   const sel: Select | undefined = q.select
   if (sel === undefined) {
@@ -187,9 +186,11 @@ function validateSelect(q: Query): void {
   checkString('select.head', sel.head)
   checkString('select.claim', sel.claim)
   checkArray('select.path', sel.path)
+  // `R-QSCOPE`: the scope is mandatory and an empty branch is refused.
   if (sel.branch === undefined || sel.branch === '') {
     throw new RankeQueryError('ErrQueryNoScope', 'select.branch', 'a scope is mandatory')
   }
+  // `R-QHEAD`: required under $universe, optional under every other scope.
   if (sel.branch === '$universe' && sel.head === undefined) {
     throw new RankeQueryError(
       'ErrQueryNoHead',
@@ -205,19 +206,13 @@ function validateSelect(q: Query): void {
   path.forEach((step, i) => validateStep(step, `select.path[${i}]`))
   if (path.length > 0) return
 
-  // A scan.
+  // A scan. A path-less `claim` stands: it anchors the frontier the closure is taken
+  // from (`R-QANCHOR`), which is a route of its own.
   if (q.output?.shape === 'path') {
     throw new RankeQueryError(
       'ErrQueryScanShape',
       'output.shape',
       'a scan reaches claims by no stated route, so the shape must be single',
-    )
-  }
-  if (sel.claim !== undefined) {
-    throw new RankeQueryError(
-      'ErrQueryScanClaim',
-      'select.claim',
-      'a scan has no traversal to start',
     )
   }
 }
@@ -340,7 +335,7 @@ function validateOutput(o: Output): void {
   checkObject('output.content', o.content, KEYS.content)
   checkInt('output.content.max', o.content.max)
   checkString('output.content.overflow', o.content.overflow)
-  // An absent overflow is omit (R-QCONTENT), so a cap alone is a whole content pair.
+  // An absent overflow is omit (`R-QCONTENT`), so a cap alone is a whole content pair.
   oneOf('output.content.overflow', o.content.overflow, OVERFLOWS)
   // A byte cap is a count, which the schema bounds at zero.
   if (o.content.max === undefined || o.content.max < 0) {

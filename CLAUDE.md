@@ -1,11 +1,20 @@
 # Requirements for new Agents
 
-You MUST read `docs/papers/*` (fetch with `make docs`). That's the precondition to
-do anything in this repo.
+Run `make docs` FIRST, then read `docs/papers/*`. That's the precondition to do
+anything in this repo.
+
+Run it even when `docs/papers/` is already there. The directory is gitignored, so
+whatever it holds came from some earlier fetch and carries no date you can see: it
+reads exactly like a current copy at any age. Fetching costs one command, and an
+answer given against a stale spec is worth nothing. An agent has already audited
+this library's rule citations against a copy it found rather than fetched.
 
 When starting to plan a change, *always RE-read* the relevant sections in the docs.
 Agents tend to forget details from the papers. The papers specify all details, so no
 guessing required.
+
+`make verify` runs `scripts/rule-citations.sh`, which needs the fetched spec and
+fails without it — so a bare checkout cannot pass the gate blind.
 
 # ranke-go is the reference
 

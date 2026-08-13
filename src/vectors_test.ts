@@ -111,7 +111,7 @@ function accepts(a: ArtifactSet, c: ClaimCase, closure: Map<string, Claim>): boo
   let max = 0
   for (const e of claim.edges) {
     const target = closure.get(e.reference)
-    if (target === undefined) return false // V-REF: a reference resolves in the closure
+    if (target === undefined) return false // `V-REF`: a reference resolves in the closure
     if (target.height > max) max = target.height
   }
   const want = claim.edges.length === 0 ? 0 : max + 1
