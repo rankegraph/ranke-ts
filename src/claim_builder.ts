@@ -42,9 +42,13 @@ import {
   NodeClassDerivation,
   NodeClassEntity,
   NodeClassRelation,
+  NodeSubtypeBranches,
   NodeSubtypeContributor,
+  NodeSubtypeDelete,
+  NodeSubtypeExpiry,
   validNodeClass,
 } from './node_taxonomy.ts'
+import { validRFC3339Nano } from './time_fields.ts'
 import { compareBytes } from './internal/cbor.ts'
 
 /** RankeBuildError reports a claim that cannot be built. */
@@ -90,7 +94,7 @@ export interface EdgeInput {
   readonly content?: ContentRef
   /**
    * referenced is the claim `reference` names, for the fields an edge takes from its
-   * target: the delete_by every edge must carry (R-DELBY). Supply it wherever the
+   * target: the delete_by every edge must carry (R-DPLANNED). Supply it wherever the
    * target is in hand, since an edge cannot learn this after it is built.
    */
   readonly referenced?: Claim
@@ -157,7 +161,7 @@ function buildEdge(input: EdgeInput): BuiltEdge {
   checkContent(input.content)
   let fields = input.fields
 
-  // The target's schedule travels with the reference (R-DELBY), so it is part of the
+  // The target's schedule travels with the reference (R-DPLANNED), so it is part of the
   // edge from the start; an edge stating one keeps what it states.
   if (input.referenced !== undefined) {
     const due = input.referenced.fields[FieldDeleteBy]
@@ -203,11 +207,7 @@ export function newClaim(input: ClaimInput): { claim: Claim; bytes: Uint8Array; 
     throw new RankeBuildError(`height ${height} is not a generation a record carries`)
   }
 
-  // A contribution/* claim is the structure a read walks, so none of it schedules its
-  // own removal (R-DELBY scaffolding rule).
-  if (typeClass === NodeClassContribution && input.fields?.[FieldDeleteBy] !== undefined) {
-    throw new RankeBuildError(`a ${typeClass}/* claim takes no ${FieldDeleteBy}`)
-  }
+  checkDeletable(typeClass, typeSub, input.fields)
 
   // The one claim that stands alone: a contributor claim with nothing to attribute to
   // (§4.3), which is where a graph begins.
@@ -430,6 +430,29 @@ function checkContent(content: ContentRef | undefined): void {
   }
 }
 
+// undeletableSubtypes is R-DSTRUCT's closed set, by subtype.
+const undeletableSubtypes = new Set([
+  NodeSubtypeContributor,
+  NodeSubtypeBranches,
+  NodeSubtypeDelete,
+  NodeSubtypeExpiry,
+])
+
+// checkDeletable holds a claim to R-DSTRUCT: four contribution subtypes schedule no
+// removal of their own, each being what another rule reads — a contributor's pubkey
+// (V-SIG), the chain to the initial table (V-ARCHIVE), a gap's explanation (R-DGAP), a
+// key's window (R-DEXPIRY). Every other subtype is open vocabulary (V-TYPE), so any
+// other claim may.
+function checkDeletable(
+  typeClass: string,
+  typeSub: string,
+  fields: Readonly<Record<string, string>> | undefined,
+): void {
+  if (typeClass !== NodeClassContribution || !undeletableSubtypes.has(typeSub)) return
+  if (fields?.[FieldDeleteBy] === undefined) return
+  throw new RankeBuildError(`a ${typeClass}/${typeSub} claim takes no ${FieldDeleteBy}`)
+}
+
 // representableCount holds a count to what a record carries and a number holds exactly:
 // a size or a height beyond 2^53 reads back as a different value.
 function representableCount(n: number): boolean {
@@ -465,7 +488,7 @@ function checkFields(fields: Readonly<Record<string, string>> | undefined): void
  */
 export function normalizeCreatedAt(at: string | Date | undefined): string {
   if (typeof at === 'string') {
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{9}Z$/.test(at)) {
+    if (!validRFC3339Nano(at)) {
       throw new RankeBuildError(
         `created_at is fixed-width nanoseconds in UTC (2026-01-02T03:04:05.123456789Z), got ${JSON.stringify(at)}`,
       )

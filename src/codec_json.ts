@@ -9,6 +9,7 @@ import { RankeDecodeError, parseCreatedAt } from './codec.ts'
 import { type ContentRef, contentNone } from './content.ts'
 import type { RelationDirection } from './edge_taxonomy.ts'
 import { splitType } from './filter.ts'
+import { checkTimestampFields } from './time_fields.ts'
 
 /**
  * WireClaim is the JSON a read returns under `encoding: json`, as ranke-go's
@@ -63,7 +64,7 @@ export function decodeClaimJSON(w: WireClaim): Claim {
     createdAt,
     createdAtMs: parseCreatedAt(createdAt),
     height: num(w.height, 'height'),
-    fields: Object.freeze({ ...(w.fields ?? {}) }),
+    fields: wireFields(w.fields),
     content: wireContent(w),
     edges: Object.freeze((w.edges ?? []).map(decodeEdgeJSON)),
   })
@@ -81,10 +82,19 @@ function decodeEdgeJSON(w: WireEdge): Edge {
     type,
     typeClass,
     typeSub,
-    fields: Object.freeze({ ...(w.fields ?? {}) }),
+    fields: wireFields(w.fields),
     relationDirection: dir as RelationDirection,
     content: wireContent(w),
   })
+}
+
+// wireFields holds a JSON record's fields to V-TIME, the projection being a door a claim
+// arrives through as much as the CBOR form is.
+function wireFields(f: Record<string, string> | undefined): Readonly<Record<string, string>> {
+  const out = { ...(f ?? {}) }
+  const bad = checkTimestampFields(out)
+  if (bad !== null) throw new RankeDecodeError(`a timestamp is not RFC 3339 nanoseconds: ${bad}`)
+  return Object.freeze(out)
 }
 
 // wireContent resolves the declaration a JSON record carries. Content is base64, as

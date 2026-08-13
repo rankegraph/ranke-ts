@@ -8,8 +8,8 @@
 // the wrong thing, and this file exists because that happened.
 //
 // Regenerate with `scripts/fixtures.sh` whenever the record layout or the alias
-// tables move. These are only the valid cases; the negative cases live in
-// ranke-graph's published testdata (see vectors_test.ts).
+// tables move. `refusals` holds records ranke-go's decode rejects; the wider negative
+// set lives in ranke-graph's published testdata (see vectors_test.ts).
 
 import { readFileSync } from 'node:fs'
 
@@ -65,12 +65,24 @@ export interface Capped {
   readonly json: unknown
 }
 
+/**
+ * Refusal is a record ranke-go's decode rejects. Agreement on the accepted set says
+ * nothing about what a reader lets through, which is what these cases hold.
+ */
+export interface Refusal {
+  readonly label: string
+  readonly cbor: string
+  /** ranke-go's message, for reading a failure: each library words a refusal its own way. */
+  readonly error: string
+}
+
 interface FixtureFile {
   readonly note: string
   readonly provenance: Provenance
   readonly ids: Readonly<Record<string, string>>
   readonly fixtures: readonly Fixture[]
   readonly capped: readonly Capped[]
+  readonly refusals: readonly Refusal[]
 }
 
 const file: FixtureFile = JSON.parse(
@@ -87,6 +99,9 @@ export const all: readonly Fixture[] = file.fixtures
 
 /** capped holds the source claim served under each content option R-QCONTENT admits. */
 export const capped: readonly Capped[] = file.capped
+
+/** refusals holds records ranke-go's decode rejects, each with the reason it gave. */
+export const refusals: readonly Refusal[] = file.refusals
 
 function byLabel(label: string): Fixture {
   const f = all.find((x) => x.label === label)
@@ -116,7 +131,7 @@ export const identityNote = byLabel('identity-note')
 export const identityDerived = byLabel('identity-derived')
 
 /** cborBytes decodes a fixture's hex. */
-export function cborBytes(f: Fixture | Capped): Uint8Array {
+export function cborBytes(f: Fixture | Capped | Refusal): Uint8Array {
   const out = new Uint8Array(f.cbor.length / 2)
   for (let i = 0; i < out.length; i++) {
     out[i] = Number.parseInt(f.cbor.slice(i * 2, i * 2 + 2), 16)

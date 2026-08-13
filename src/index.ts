@@ -18,6 +18,7 @@ export * from './node_taxonomy.ts'
 export * from './edge_taxonomy.ts'
 export * from './encoding_taxonomy.ts'
 export * from './field_taxonomy.ts'
+export * from './time_fields.ts'
 
 // The CBOR layer is exported so a caller can frame its own stream or hash a record
 // it holds; the reader refuses non-canonical bytes, which a general CBOR library

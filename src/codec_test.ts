@@ -12,6 +12,9 @@ import * as fx from './testing/fixtures.ts'
 // reference implementation, so these are the specification of a decode: the CBOR
 // path and the JSON path must both arrive at the claim it produced.
 
+// A timestamp in the one form V-TIME admits, for the JSON records built by hand here.
+const AT = '2026-01-01T00:00:00.000000000Z'
+
 // The fixtures must trace to a version, so that a regeneration part-way through a
 // change cannot bake in an unreleased encoder unnoticed. This runs first, because a
 // stale fixture set makes every assertion below meaningless.
@@ -229,7 +232,7 @@ test('decodeClaim refuses a truncated record', () => {
 })
 
 test('decodeClaimJSON refuses a record missing its type or timestamp', () => {
-  assert.throws(() => decodeClaimJSON({ created_at: '2026-01-01T00:00:00Z' }), RankeDecodeError)
+  assert.throws(() => decodeClaimJSON({ created_at: AT }), RankeDecodeError)
   assert.throws(() => decodeClaimJSON({ type: 'source/note' }), RankeDecodeError)
   assert.throws(
     () => decodeClaimJSON({ type: 'source/note', created_at: 'not a date' }),
@@ -237,15 +240,41 @@ test('decodeClaimJSON refuses a record missing its type or timestamp', () => {
   )
 })
 
+// V-TIME fixes one representation, so a timestamp a lax reader would take is refused:
+// otherwise two implementations disagree on what a claim says while both read it.
+test('decodeClaimJSON refuses a created_at outside the one form', () => {
+  for (const at of [
+    '2026-01-01T00:00:00Z', // no fraction
+    '2026-01-01T00:00:00.000Z', // milliseconds, not nanoseconds
+    '2026-01-01T00:00:00.000000000+01:00', // an offset, where V-TIME fixes UTC
+    '2026-01-01', // a date alone
+    '2026-02-30T00:00:00.000000000Z', // a day February does not have
+    '2026-01-01T24:00:00.000000000Z', // an hour a day does not have
+  ]) {
+    assert.throws(() => decodeClaimJSON({ type: 'source/note', created_at: at }), RankeDecodeError, at)
+  }
+  decodeClaimJSON({ type: 'source/note', created_at: AT }) // the control
+})
+
 test('decodeClaimJSON refuses content declared both ways', () => {
   assert.throws(
     () =>
       decodeClaimJSON({
         type: 'source/note',
-        created_at: '2026-01-01T00:00:00Z',
+        created_at: AT,
         content: 'YQ==',
         content_hash: fx.ids.scanHash!,
       }),
     RankeDecodeError,
   )
+})
+
+// A record ranke-go's decode rejects, which ranke-ts must reject too: agreement on the
+// accepted set says nothing about what a reader lets through. The bytes and the verdict
+// are both ranke-go's (tools/fixtures), so nothing here is hand-written.
+test('decodeClaim refuses every record ranke-go refuses', () => {
+  assert.ok(fx.refusals.length > 0, 'the refusal cases are missing — regenerate the file')
+  for (const r of fx.refusals) {
+    assert.throws(() => decodeClaim(fx.cborBytes(r)), RankeDecodeError, r.label)
+  }
 })

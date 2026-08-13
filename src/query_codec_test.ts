@@ -51,10 +51,10 @@ test('the oracle comes from a released ranke-go and is whole', () => {
   )
 })
 
-// Two rules ranke-go enforces when a read runs (archive.go validateSelect) rather
-// than in ValidateQuery, which the oracle calls. ranke-ts folds them in, since a
-// client that catches them saves the round trip the server would spend refusing.
-const READ_TIME_RULES = new Set(['ErrQueryScanShape', 'ErrQueryScanClaim'])
+// The rule ranke-go enforces when a read runs (archive.go validateSelect) rather than
+// in ValidateQuery, which the oracle calls. ranke-ts folds it in, since a client that
+// catches it saves the round trip the server would spend refusing.
+const READ_TIME_RULES = new Set(['ErrQueryScanShape'])
 
 // The verdict a client cares about: would the server take this query. Disagreeing
 // either way is a defect — accepting what ranke-go refuses wastes a round trip, and
@@ -82,27 +82,29 @@ test('ValidateQuery agrees with ranke-go on every case', () => {
   assert.deepEqual(disagreements, [])
 })
 
-// The fold is deliberate, so each read-time rule must actually fire on the case that
+// The fold is deliberate, so the read-time rule must actually fire on the case that
 // breaks it — which is what keeps the escape hatch above from widening.
-test('the read-time scan rules are caught before sending', () => {
-  const scans: Array<[string, string]> = [
-    ['{"select":{"branch":"main"},"output":{"shape":"path"}}', 'ErrQueryScanShape'],
-    [
-      '{"select":{"branch":"main","claim":"bciqlu6awx6hqdt7kifaubxs5vyrchmadmgrzmf32ts2bb73b6iablli"}}',
-      'ErrQueryScanClaim',
-    ],
-  ]
-  for (const [json, code] of scans) {
-    try {
-      ValidateQuery(JSON.parse(json) as Query)
-      assert.fail(`expected ${code} for ${json}`)
-    } catch (err) {
-      assert.ok(err instanceof RankeQueryError)
-      assert.equal(err.code, code)
-    }
+test('the read-time scan rule is caught before sending', () => {
+  const scan = '{"select":{"branch":"main"},"output":{"shape":"path"}}'
+  try {
+    ValidateQuery(JSON.parse(scan) as Query)
+    assert.fail(`expected ErrQueryScanShape for ${scan}`)
+  } catch (err) {
+    assert.ok(err instanceof RankeQueryError)
+    assert.equal(err.code, 'ErrQueryScanShape')
   }
-  // A path makes the route explicit, so neither rule applies.
+  // A path makes the route explicit, so the rule does not apply.
   ValidateQuery({ select: { branch: 'main', path: [{}] }, output: { shape: 'path' } })
+})
+
+// A path-less claim anchors the frontier the closure is taken from (R-QANCHOR), so it is
+// a read of what one claim reaches. ranke-go once refused it as a traversal with no
+// start, and this library inherited that; the case keeps the refusal from returning.
+test('a path-less claim is a legal read', () => {
+  const anchored: Query = {
+    select: { branch: 'main', claim: 'bciqlu6awx6hqdt7kifaubxs5vyrchmadmgrzmf32ts2bb73b6iablli' },
+  }
+  ValidateQuery(anchored)
 })
 
 // Where ranke-go named the rule, ranke-ts must name the same one: a client switching

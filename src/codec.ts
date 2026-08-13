@@ -22,6 +22,7 @@ import {
   nodeSubtypeFromAlias,
   nodeSubtypeToAlias,
 } from './node_taxonomy.ts'
+import { checkTimestampFields, validRFC3339Nano } from './time_fields.ts'
 import {
   CborReader,
   CborWriter,
@@ -189,7 +190,12 @@ function bytes(raw: Uint8Array | undefined): Uint8Array | null {
 }
 
 function fields(raw: Uint8Array | undefined): Readonly<Record<string, string>> {
-  return Object.freeze(raw === undefined ? {} : readTextMap(raw))
+  const out = raw === undefined ? {} : readTextMap(raw)
+  // V-TIME covers delete_by and the two pubkey bounds as well as created_at. Read at
+  // the door, since a record that arrived as bytes meets no other parser.
+  const bad = checkTimestampFields(out)
+  if (bad !== null) throw new RankeDecodeError(`a timestamp is not RFC 3339 nanoseconds: ${bad}`)
+  return Object.freeze(out)
 }
 
 // content resolves the three-way declaration: inline bytes, an external address, or
@@ -398,13 +404,15 @@ function contentFromRef(ref: ContentRef | undefined): ContentRef {
 }
 
 /**
- * parseCreatedAt returns epoch milliseconds for an RFC 3339 timestamp, dropping any
- * precision past the millisecond — which is why claim.createdAt keeps the string.
+ * parseCreatedAt returns epoch milliseconds for a created_at in the one form V-TIME
+ * admits, dropping precision past the millisecond — which is why claim.createdAt keeps
+ * the string.
  */
 export function parseCreatedAt(s: string): number {
-  const ms = Date.parse(s)
-  if (Number.isNaN(ms)) throw new RankeDecodeError(`created_at is not RFC 3339: ${s}`)
-  return ms
+  if (!validRFC3339Nano(s)) {
+    throw new RankeDecodeError(`created_at is not RFC 3339 nanoseconds in UTC: ${s}`)
+  }
+  return Date.parse(s)
 }
 
 // ─── Encoding: the canonical bytes an id is computed over ─────────────

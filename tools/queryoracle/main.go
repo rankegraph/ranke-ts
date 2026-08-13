@@ -48,7 +48,6 @@ var sentinels = []struct {
 	{"ErrQueryNoScope", ranke.ErrQueryNoScope},
 	{"ErrQueryNoHead", ranke.ErrQueryNoHead},
 	{"ErrQueryScanShape", ranke.ErrQueryScanShape},
-	{"ErrQueryScanClaim", ranke.ErrQueryScanClaim},
 	{"ErrQueryWhereForm", ranke.ErrQueryWhereForm},
 	{"ErrQueryComparisonForm", ranke.ErrQueryComparisonForm},
 	{"ErrQueryHops", ranke.ErrQueryHops},
@@ -127,6 +126,12 @@ func main() {
 		{"a fractional duration", `{"select":{"branch":"main"},"limit":{"time":"1.5s"}}`},
 		{"results 0 means unbounded", `{"select":{"branch":"main"},"limit":{"results":0}}`},
 		{"a scan may ask for shape single", `{"select":{"branch":"main"},"output":{"shape":"single"}}`},
+		// A path-less claim anchors the frontier the closure is taken from (R-QANCHOR),
+		// so it is a read of what one claim reaches rather than a traversal with no start.
+		{
+			"a path-less claim anchors the frontier",
+			`{"select":{"branch":"main","claim":"bciqlu6awx6hqdt7kifaubxs5vyrchmadmgrzmf32ts2bb73b6iablli"}}`,
+		},
 
 		// --- refused ---
 		{"no scope at all", `{"select":{}}`},
@@ -166,10 +171,6 @@ func main() {
 		{"an unknown report level", `{"select":{"branch":"main"},"execution":{"report":"everything"}}`},
 		{"a duration in no stated unit", `{"select":{"branch":"main"},"limit":{"time":"5 seconds"}}`},
 		{"a scan asking for a path shape", `{"select":{"branch":"main"},"output":{"shape":"path"}}`},
-		{
-			"a scan anchored at a claim",
-			`{"select":{"branch":"main","claim":"bciqlu6awx6hqdt7kifaubxs5vyrchmadmgrzmf32ts2bb73b6iablli"}}`,
-		},
 		{"an id that is not multibase base32", `{"select":{"branch":"$universe","head":"NOT-AN-ID"}}`},
 
 		// --- refused while decoding: shape rather than value ---
