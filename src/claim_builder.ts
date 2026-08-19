@@ -284,8 +284,9 @@ function assembleEdges(
   }
 
   checkEdgeCardinality(edges)
-  // §3.5, `V-PROV`: a claim of these classes rests on stated provenance. A
-  // contribution/contributor edge does not satisfy it.
+  // §3.5: a claim of these classes rests on stated provenance, and a
+  // contribution/contributor edge does not satisfy it. The spec has retired the id that
+  // stated this (V-PROV), so the foundation paper is the source until one names it again.
   if (requiresProvenance(typeClass) && !edges.some((e) => e.record.typeClass === EdgeClassDerivation)) {
     throw new RankeBuildError(`a ${typeClass}/* claim carries at least one derivation/* edge`)
   }

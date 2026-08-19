@@ -22,6 +22,22 @@ import {
   nodeSubtypeFromAlias,
   nodeSubtypeToAlias,
 } from './node_taxonomy.ts'
+import {
+  ClaimFileKeyNode,
+  EdgeKeyReference,
+  EdgeKeyRelationDirection,
+  NodeKeyCreatedAt,
+  NodeKeyEdges,
+  NodeKeyHeight,
+  RecordKeyContent,
+  RecordKeyContentHash,
+  RecordKeyContentSize,
+  RecordKeyEncodingClass,
+  RecordKeyEncodingSubtype,
+  RecordKeyFields,
+  RecordKeyTypeClass,
+  RecordKeyTypeSubtype,
+} from './record_keys.ts'
 import { checkTimestampFields, validRFC3339Nano } from './time_fields.ts'
 import {
   CborReader,
@@ -37,44 +53,9 @@ export class RankeDecodeError extends Error {
   override readonly name: string = 'RankeDecodeError'
 }
 
-// The claim file wraps the node record under key 1, and the node record's own keys are
-// the ones `V-SER` fixes. A key absent means its zero value: the encoder drops an empty
-// string, an empty collection and a zero number.
-const CLAIM_NODE = 1
-
-// Keys 1 to 8 are the slots a node and an edge share, so one number means one thing in
-// either record. A node then takes 9 to 11 and an edge 12 to 13 (`V-SER`).
-const SHARED_TYPE_CLASS = 1
-const SHARED_TYPE_SUB = 2
-const SHARED_ENCODING_CLASS = 3
-const SHARED_ENCODING_SUB = 4
-const SHARED_CONTENT_HASH = 5
-const SHARED_CONTENT = 6
-const SHARED_CONTENT_SIZE = 7
-const SHARED_FIELDS = 8
-
-const N_TYPE_CLASS = SHARED_TYPE_CLASS
-const N_TYPE_SUB = SHARED_TYPE_SUB
-const N_ENCODING_CLASS = SHARED_ENCODING_CLASS
-const N_ENCODING_SUB = SHARED_ENCODING_SUB
-const N_CONTENT_HASH = SHARED_CONTENT_HASH
-const N_CONTENT = SHARED_CONTENT
-const N_CONTENT_SIZE = SHARED_CONTENT_SIZE
-const N_FIELDS = SHARED_FIELDS
-const N_CREATED_AT = 9
-const N_EDGES = 10
-const N_HEIGHT = 11
-
-const E_TYPE_CLASS = SHARED_TYPE_CLASS
-const E_TYPE_SUB = SHARED_TYPE_SUB
-const E_ENCODING_CLASS = SHARED_ENCODING_CLASS
-const E_ENCODING_SUB = SHARED_ENCODING_SUB
-const E_CONTENT_HASH = SHARED_CONTENT_HASH
-const E_CONTENT = SHARED_CONTENT
-const E_CONTENT_SIZE = SHARED_CONTENT_SIZE
-const E_FIELDS = SHARED_FIELDS
-const E_REFERENCE = 12
-const E_RELATION_DIRECTION = 13
+// The keys are record_keys.ts's, so the table that module exports is the one a decode
+// reads. A key absent means its zero value: the encoder drops an empty string, an empty
+// collection and a zero number.
 
 /** DecodeOptions tunes what a decode spends effort on. */
 export interface DecodeOptions {
@@ -95,7 +76,7 @@ export function decodeClaim(bytes: Uint8Array, id = '', opts: DecodeOptions = {}
     const r = new CborReader(bytes)
     const entries = readIntMap(r)
     r.expectEnd()
-    const nodeRaw = entries.get(CLAIM_NODE)
+    const nodeRaw = entries.get(ClaimFileKeyNode)
     if (nodeRaw === undefined) throw new RankeDecodeError('the claim carries no node record')
     return decodeNode(nodeRaw, id, opts)
   } catch (err) {
@@ -112,7 +93,7 @@ export function decodeClaim(bytes: Uint8Array, id = '', opts: DecodeOptions = {}
 export function nodePreimage(bytes: Uint8Array): Uint8Array {
   const r = new CborReader(bytes)
   const entries = readIntMap(r)
-  const node = entries.get(CLAIM_NODE)
+  const node = entries.get(ClaimFileKeyNode)
   if (node === undefined) throw new RankeDecodeError('the claim carries no node record')
   return node
 }
@@ -232,15 +213,15 @@ function content(
 function decodeNode(raw: Uint8Array, id: string, opts: DecodeOptions): Claim {
   const m = readIntMap(new CborReader(raw))
 
-  const typeClass = unalias(text(m.get(N_TYPE_CLASS)), nodeClassFromAlias)
-  const typeSub = unalias(text(m.get(N_TYPE_SUB)), nodeSubtypeFromAlias)
+  const typeClass = unalias(text(m.get(RecordKeyTypeClass)), nodeClassFromAlias)
+  const typeSub = unalias(text(m.get(RecordKeyTypeSubtype)), nodeSubtypeFromAlias)
   if (typeClass === '' || typeSub === '') {
     throw new RankeDecodeError('a node record states no type')
   }
-  const createdAt = text(m.get(N_CREATED_AT))
+  const createdAt = text(m.get(NodeKeyCreatedAt))
   if (createdAt === '') throw new RankeDecodeError('a node record states no created_at')
 
-  const edgesRaw = m.get(N_EDGES)
+  const edgesRaw = m.get(NodeKeyEdges)
   const edges = edgesRaw === undefined ? [] : decodeEdges(edgesRaw, opts)
 
   return Object.freeze({
@@ -250,14 +231,14 @@ function decodeNode(raw: Uint8Array, id: string, opts: DecodeOptions): Claim {
     typeSub,
     createdAt,
     createdAtMs: parseCreatedAt(createdAt),
-    height: uint(m.get(N_HEIGHT)),
-    fields: fields(m.get(N_FIELDS)),
+    height: uint(m.get(NodeKeyHeight)),
+    fields: fields(m.get(RecordKeyFields)),
     content: content(
-      bytes(m.get(N_CONTENT)),
-      bytes(m.get(N_CONTENT_HASH)),
-      uint(m.get(N_CONTENT_SIZE)),
-      unalias(text(m.get(N_ENCODING_CLASS)), encodingClassFromAlias),
-      unalias(text(m.get(N_ENCODING_SUB)), encodingSubFromAlias),
+      bytes(m.get(RecordKeyContent)),
+      bytes(m.get(RecordKeyContentHash)),
+      uint(m.get(RecordKeyContentSize)),
+      unalias(text(m.get(RecordKeyEncodingClass)), encodingClassFromAlias),
+      unalias(text(m.get(RecordKeyEncodingSubtype)), encodingSubFromAlias),
     ),
     edges: Object.freeze(edges),
   })
@@ -277,15 +258,15 @@ function decodeEdges(raw: Uint8Array, opts: DecodeOptions): Edge[] {
 function decodeEdge(raw: Uint8Array, opts: DecodeOptions): Edge {
   const m = readIntMap(new CborReader(raw))
 
-  const reference = bytes(m.get(E_REFERENCE))
+  const reference = bytes(m.get(EdgeKeyReference))
   if (reference === null) throw new RankeDecodeError('an edge states no reference')
-  const typeClass = unalias(text(m.get(E_TYPE_CLASS)), edgeClassFromAlias)
-  const typeSub = unalias(text(m.get(E_TYPE_SUB)), edgeSubtypeFromAlias)
+  const typeClass = unalias(text(m.get(RecordKeyTypeClass)), edgeClassFromAlias)
+  const typeSub = unalias(text(m.get(RecordKeyTypeSubtype)), edgeSubtypeFromAlias)
   if (typeClass === '' || typeSub === '') {
     throw new RankeDecodeError('an edge states no type')
   }
 
-  const dirRaw = m.get(E_RELATION_DIRECTION)
+  const dirRaw = m.get(EdgeKeyRelationDirection)
   let relationDirection: RelationDirection = 0
   if (dirRaw !== undefined) {
     const r = new CborReader(dirRaw)
@@ -302,14 +283,14 @@ function decodeEdge(raw: Uint8Array, opts: DecodeOptions): Edge {
     type: `${typeClass}/${typeSub}`,
     typeClass,
     typeSub,
-    fields: fields(m.get(E_FIELDS)),
+    fields: fields(m.get(RecordKeyFields)),
     relationDirection,
     content: content(
-      bytes(m.get(E_CONTENT)),
-      bytes(m.get(E_CONTENT_HASH)),
-      uint(m.get(E_CONTENT_SIZE)),
-      unalias(text(m.get(E_ENCODING_CLASS)), encodingClassFromAlias),
-      unalias(text(m.get(E_ENCODING_SUB)), encodingSubFromAlias),
+      bytes(m.get(RecordKeyContent)),
+      bytes(m.get(RecordKeyContentHash)),
+      uint(m.get(RecordKeyContentSize)),
+      unalias(text(m.get(RecordKeyEncodingClass)), encodingClassFromAlias),
+      unalias(text(m.get(RecordKeyEncodingSubtype)), encodingSubFromAlias),
     ),
     // The edge id is H(S(e)) over its stored bytes, never over a re-encode, so it
     // stays stable as the alias taxonomy grows.
@@ -451,21 +432,21 @@ export interface EdgeRecord {
  */
 export function encodeEdge(e: EdgeRecord): Uint8Array {
   const entries: Array<readonly [Uint8Array, Uint8Array]> = [
-    [encodeUint(E_REFERENCE), encodeIdBytes(e.reference)],
-    [encodeUint(E_TYPE_CLASS), encodeText(aliasToWire(e.typeClass, edgeClassToAlias))],
-    [encodeUint(E_TYPE_SUB), encodeText(aliasToWire(e.typeSub, edgeSubtypeToAlias))],
+    [encodeUint(EdgeKeyReference), encodeIdBytes(e.reference)],
+    [encodeUint(RecordKeyTypeClass), encodeText(aliasToWire(e.typeClass, edgeClassToAlias))],
+    [encodeUint(RecordKeyTypeSubtype), encodeText(aliasToWire(e.typeSub, edgeSubtypeToAlias))],
   ]
   if (e.relationDirection !== undefined && e.relationDirection !== 0) {
-    entries.push([encodeUint(E_RELATION_DIRECTION), encodeInt(e.relationDirection)])
+    entries.push([encodeUint(EdgeKeyRelationDirection), encodeInt(e.relationDirection)])
   }
   const fields = encodeFields(e.fields)
-  if (fields !== null) entries.push([encodeUint(E_FIELDS), fields])
+  if (fields !== null) entries.push([encodeUint(RecordKeyFields), fields])
   pushContent(entries, e.content, {
-    hash: E_CONTENT_HASH,
-    size: E_CONTENT_SIZE,
-    encodingClass: E_ENCODING_CLASS,
-    encodingSub: E_ENCODING_SUB,
-    inline: E_CONTENT,
+    hash: RecordKeyContentHash,
+    size: RecordKeyContentSize,
+    encodingClass: RecordKeyEncodingClass,
+    encodingSub: RecordKeyEncodingSubtype,
+    inline: RecordKeyContent,
   })
 
   const w = new CborWriter()
@@ -493,25 +474,25 @@ export function encodeNode(n: NodeRecord): Uint8Array {
  */
 export function encodeNodeWithEdges(n: NodeRecord, edges: readonly Uint8Array[]): Uint8Array {
   const entries: Array<readonly [Uint8Array, Uint8Array]> = [
-    [encodeUint(N_TYPE_CLASS), encodeText(aliasToWire(n.typeClass, nodeClassToAlias))],
-    [encodeUint(N_TYPE_SUB), encodeText(aliasToWire(n.typeSub, nodeSubtypeToAlias))],
-    [encodeUint(N_CREATED_AT), encodeText(n.createdAt)],
+    [encodeUint(RecordKeyTypeClass), encodeText(aliasToWire(n.typeClass, nodeClassToAlias))],
+    [encodeUint(RecordKeyTypeSubtype), encodeText(aliasToWire(n.typeSub, nodeSubtypeToAlias))],
+    [encodeUint(NodeKeyCreatedAt), encodeText(n.createdAt)],
   ]
-  if (n.height !== 0) entries.push([encodeUint(N_HEIGHT), encodeUint(n.height)])
+  if (n.height !== 0) entries.push([encodeUint(NodeKeyHeight), encodeUint(n.height)])
   const fields = encodeFields(n.fields)
-  if (fields !== null) entries.push([encodeUint(N_FIELDS), fields])
+  if (fields !== null) entries.push([encodeUint(RecordKeyFields), fields])
   pushContent(entries, n.content, {
-    hash: N_CONTENT_HASH,
-    size: N_CONTENT_SIZE,
-    encodingClass: N_ENCODING_CLASS,
-    encodingSub: N_ENCODING_SUB,
-    inline: N_CONTENT,
+    hash: RecordKeyContentHash,
+    size: RecordKeyContentSize,
+    encodingClass: RecordKeyEncodingClass,
+    encodingSub: RecordKeyEncodingSubtype,
+    inline: RecordKeyContent,
   })
   if (edges.length > 0) {
     const w = new CborWriter()
     w.writeArrayHeader(edges.length)
     for (const raw of edges) w.writeRaw(raw)
-    entries.push([encodeUint(N_EDGES), w.bytes()])
+    entries.push([encodeUint(NodeKeyEdges), w.bytes()])
   }
 
   const w = new CborWriter()
@@ -532,7 +513,7 @@ export function encodeClaim(n: NodeRecord): Uint8Array {
  */
 export function encodeClaimFromNode(node: Uint8Array): Uint8Array {
   const w = new CborWriter()
-  w.writeSortedMap([[encodeUint(CLAIM_NODE), node]])
+  w.writeSortedMap([[encodeUint(ClaimFileKeyNode), node]])
   return w.bytes()
 }
 

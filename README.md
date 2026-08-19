@@ -165,6 +165,29 @@ This is the one place the library departs from mirroring ranke-go, whose
 seal a struct; TypeScript gets the same guarantee from `readonly` at no runtime
 cost, and an object per accessor is a cost a browser pays for nothing.
 
+## Record keys
+
+A claim serializes as a CBOR map under the numeric keys `V-SER` fixes, and a tool
+rendering those bytes needs them by name. `record_keys.ts` exports the table:
+
+```ts
+import { NodeRecordKeys, EdgeRecordKeys, recordKeyName } from '@flocko-motion/ranke'
+
+NodeRecordKeys.get(9)            // "created_at"
+NodeRecordKeys.get(6)            // "content"
+EdgeRecordKeys.get(12)           // "reference"
+recordKeyName('node', 12)        // undefined — 12 is an edge slot
+recordKeyName('edge', 14)        // undefined — no such slot yet
+```
+
+Keys 1 to 8 are the slots a node and an edge share, so one number means one thing
+in either record; a node then takes 9 to 11 and an edge 12 to 13. An unassigned
+number has no name, so a reader shows it as the number rather than guessing.
+
+The codec reads these same constants, which is what makes the exported table the
+one a decode uses. Never transcribe it: a second copy of the numbering is free to
+drift from the encoder, and an id is computed over the encoded bytes.
+
 ## Design
 
 **Zero runtime dependencies.** Everything ships in the package, including
