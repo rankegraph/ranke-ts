@@ -39,3 +39,9 @@ jobs:
       # Every rule id a comment cites is one the spec declares. Needs the spec above.
       - name: Rule citations
         run: make rule-citations
+
+      # src/query.ts against the committed schema. Here as well as in `verify`, since
+      # this workflow is the check a PR merge waits on: drift caught only at tag time
+      # is caught after the merge that introduced it has already landed.
+      - name: Generated code
+        run: make check-generated
