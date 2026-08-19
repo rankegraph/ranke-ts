@@ -55,7 +55,6 @@ R-QFORM        another layer's: resolving a diff chain is the server's; only the
 R-QFRONTIER    another layer's: frontier membership is decided by the walk
 R-QSORT        another layer's: the sort runs where the result set does
 R-QLIMIT       another layer's: bounding a read is the engine's; the duration grammar is the schema's
-R-QLAYER       another layer's: only the engine that pins a layer can reject a name
 
 # Translation to Cypher — the graph backend's own chapter.
 R-QCYPHER      another layer's: the translation answers what the native engine does
