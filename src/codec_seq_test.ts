@@ -10,6 +10,7 @@ import {
   readRawRecords,
   readRecords,
 } from './codec_seq.ts'
+import { contentHeld, contentSize } from './content.ts'
 import { CborWriter, encodeText, encodeUint } from './internal/cbor.ts'
 import * as fx from './testing/fixtures.ts'
 
@@ -155,6 +156,29 @@ test('an empty stream yields nothing', () => {
     const r = newSeqReader(encoding)
     assert.deepEqual(r.push(new Uint8Array(0)), [])
     assert.deepEqual(r.end(), [])
+  }
+})
+
+// A capped read is how the stream is normally served, so the size a withheld body states
+// must survive the framing as well as the decode. The reader holds no content logic of its
+// own — it hands a record to the CBOR or the JSON decoder — and this is what says so, the
+// seq oracle exercising no content option.
+test('a withheld body keeps its size through either framing', () => {
+  const withheld = fx.capped.filter((c) => c.inline === 0)
+  assert.equal(withheld.length, 3, 'the options that serve a size and no bytes')
+
+  for (const c of withheld) {
+    const viaCbor = newSeqReader('cbor')
+    const cbor = [...viaCbor.push(fx.cborBytes(c)), ...viaCbor.end()]
+    assert.equal(cbor.length, 1, `${c.label}: one cbor record`)
+    assert.equal(contentSize(cbor[0]!.content), c.size, `${c.label}: cbor keeps the size`)
+    assert.equal(contentHeld(cbor[0]!.content), 0, `${c.label}: cbor holds no bytes`)
+
+    const viaJson = newSeqReader('json')
+    const json = [...viaJson.push(jsonSeq(c.json)), ...viaJson.end()]
+    assert.equal(json.length, 1, `${c.label}: one json record`)
+    assert.equal(contentSize(json[0]!.content), c.size, `${c.label}: json keeps the size`)
+    assert.equal(contentHeld(json[0]!.content), 0, `${c.label}: json holds no bytes`)
   }
 })
 

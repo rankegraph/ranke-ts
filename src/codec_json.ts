@@ -97,8 +97,9 @@ function wireFields(f: Record<string, string> | undefined): Readonly<Record<stri
   return Object.freeze(out)
 }
 
-// wireContent resolves the declaration a JSON record carries. Content is base64, as
-// JSON renders bytes, and a capped read may leave a hash where the bytes were.
+// wireContent resolves the declaration a JSON record carries. Content is base64, as JSON
+// renders bytes. It resolves the same three ways codec.ts's `content` does, the projection
+// carrying the same information as the record it projects (`R-QENCODING`).
 function wireContent(w: WireClaim | WireEdge): ContentRef {
   const encoding = w.encoding ?? ''
   const size = w.content_size ?? 0
@@ -111,6 +112,12 @@ function wireContent(w: WireClaim | WireEdge): ContentRef {
   if (w.content_hash !== undefined) {
     return Object.freeze({ kind: 'external', hash: w.content_hash, size, encoding })
   }
+  // A size with neither the bytes nor an address: inline content the read withheld
+  // (`R-QCONTENT`), which a server serves size-first so a client sees that content exists
+  // and how long it is. External content always states its address, so this is never an
+  // address the projection dropped. It holds an empty run of bytes rather than none, so a
+  // reader compares lengths as ever and contentComplete tells it apart from whole content.
+  if (size > 0) return Object.freeze({ kind: 'inline', bytes: new Uint8Array(0), size, encoding })
   return contentNone
 }
 

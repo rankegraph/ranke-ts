@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { decodeClaim } from './codec.ts'
+import { decodeClaimJSON, type WireClaim } from './codec_json.ts'
 import { contentComplete, contentHeld, contentSize, inlineBytes } from './content.ts'
 import { type Capped, capped, cborBytes } from './testing/fixtures.ts'
 
@@ -112,5 +113,39 @@ test('the JSON projection caps content alike', () => {
     const inlined = typeof raw === 'string' ? Buffer.from(raw, 'base64').length : 0
     assert.equal(inlined, c.inline, `${c.label}: json content`)
     assert.equal(m.content_size, c.size, `${c.label}: json content_size`)
+  }
+})
+
+// Carrying the same information is not the same as reading it. The test above inspects the
+// wire and never decodes, which is why it stayed green while wireContent read a size-only
+// record as no content at all — three of these six options, every one of them a served
+// claim whose body a cap withheld.
+test('both decode paths agree on every content option', () => {
+  for (const c of capped) {
+    const fromCbor = decodeClaim(cborBytes(c), c.id).content
+    const fromJson = decodeClaimJSON(c.json as WireClaim).content
+    assert.equal(fromJson.kind, fromCbor.kind, `${c.label}: kind`)
+    assert.equal(contentSize(fromJson), contentSize(fromCbor), `${c.label}: size`)
+    assert.equal(contentHeld(fromJson), contentHeld(fromCbor), `${c.label}: bytes held`)
+    assert.equal(contentComplete(fromJson), contentComplete(fromCbor), `${c.label}: completeness`)
+  }
+})
+
+// A withheld body is content that EXISTS and was not served. The size survives, nothing is
+// held, and it is not complete — which is what lets a caller tell "too large, fetch it on
+// selection" from "this claim has no content", the two a lost size collapses into one.
+test('a withheld body keeps its size in both encodings', () => {
+  const withheld = capped.filter((c) => c.inline === 0)
+  assert.equal(withheld.length, 3, 'the options that serve a size and no bytes')
+  for (const c of withheld) {
+    for (const [via, ref] of [
+      ['cbor', decodeClaim(cborBytes(c), c.id).content],
+      ['json', decodeClaimJSON(c.json as WireClaim).content],
+    ] as const) {
+      assert.equal(contentSize(ref), c.size, `${c.label} via ${via}: the size is stated`)
+      assert.equal(contentHeld(ref), 0, `${c.label} via ${via}: no bytes are held`)
+      assert.equal(contentComplete(ref), false, `${c.label} via ${via}: and it is not whole`)
+      assert.notEqual(ref.kind, 'none', `${c.label} via ${via}: content exists`)
+    }
   }
 })
