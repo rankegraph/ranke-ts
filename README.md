@@ -287,19 +287,31 @@ Node 22 or newer. Node runs the TypeScript sources directly by stripping types,
 so the tests need no build step.
 
 ```sh
-make docs       # fetch the papers and the spec — run this first
 make install
 make test       # with a floor: node --test exits 0 on an empty glob
 make typecheck  # sources and tests
 make build      # emit dist/ with .d.ts
-make verify     # the four above, as a release must pass them
+make docs       # fetch the papers and the spec, for reading
+make verify     # the gate a release must pass
 ```
 
-`make docs` comes first because `verify` runs `scripts/rule-citations.sh`, which reads
-the spec from `docs/papers/` — gitignored, so a bare checkout fails the gate rather than
-passing blind. The gate holds every rule id a comment cites to one the spec declares, and
-every declared rule to either a citation or a line in `scripts/rule-citations.allow`
-saying why it has none. It says nothing about whether a citation is *true*; a text
+`verify` takes the latest spec and the latest published vectors before it checks
+anything. Both otherwise sit behind gitignored caches that never expire, so a run would
+report on whatever was fetched once, however long ago. A spec that moved while this code
+did not means the code is broken, and that is the finding rather than a false alarm — so
+the gate needs the network, and offline you name local copies instead:
+
+```sh
+make verify RANKE_SPEC=path/to/spec.typ RANKE_TESTDATA_DIR=path/to/vectors
+```
+
+The spec is fetched rather than tracked: there are only two ways to have one to check
+against, and committing a copy of a document that lives in a sibling repository
+duplicates it for nothing.
+
+`scripts/rule-citations.sh` is what reads it. The gate holds every rule id a comment
+cites to one the spec declares, and every declared rule to either a citation or a line in
+`scripts/rule-citations.allow` saying why it has none. It says nothing about whether a citation is *true*; a text
 comparison cannot. `R-DELBY` sat at five sites and `R-QHOPS` at one, each spelled
 consistently and naming no rule at all, which is what the gate exists to catch.
 

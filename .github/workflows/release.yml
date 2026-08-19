@@ -24,16 +24,12 @@ jobs:
 
       - run: npm ci
 
-      # `make verify` runs the rule-citation gate, which reads the spec from
-      # ranke-graph. Fetched rather than skipped: a gate that cannot see the spec
-      # cannot check it, and verify fails without it.
-      - name: Fetch the spec
-        run: make docs
-
-      # The tag is cut from a verified tree, so this guards against a dirty
-      # runner rather than against the code.
-      - name: Verify
-        run: make verify
+      # Build, not verify. The tag is cut from a commit the pull request already
+      # verified, so checking it again here would re-answer a settled question. This
+      # step is here because dist/ is gitignored and package.json ships `files:
+      # ["dist"]` — without it npm publish would upload a package with nothing in it.
+      - name: Build what gets published
+        run: make build
 
       # The tag carries the version; package.json stays at 0.0.0 in the tree so
       # no commit has to be cut to bump it.
