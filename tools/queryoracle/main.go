@@ -51,6 +51,8 @@ var sentinels = []struct {
 	{"ErrQueryWhereForm", ranke.ErrQueryWhereForm},
 	{"ErrQueryComparisonForm", ranke.ErrQueryComparisonForm},
 	{"ErrQueryHops", ranke.ErrQueryHops},
+	{"ErrQueryOrderField", ranke.ErrQueryOrderField},
+	{"ErrQueryLayerName", ranke.ErrQueryLayerName},
 	{"ErrQueryBounds", ranke.ErrQueryBounds},
 	{"ErrQueryEncoding", ranke.ErrQueryEncoding},
 	{"ErrQueryEnum", ranke.ErrQueryEnum},
@@ -166,6 +168,11 @@ func main() {
 		{"the retired reference overflow", `{"select":{"branch":"main"},"output":{"content":{"max":10,"overflow":"reference"}}}`},
 		{"max 0 inlines content in full", `{"select":{"branch":"main"},"output":{"content":{"max":0,"overflow":"omit"}}}`},
 		{"an unknown collation", `{"select":{"branch":"main"},"order":[{"field":"a","compare":"natural"}]}`},
+		// A sort key names the field it orders on, and a stated layer names a layer. The
+		// schema bounds both at minLength 1, which a hand-written validator can miss.
+		{"a sort key with an empty field", `{"select":{"branch":"main"},"order":[{"field":""}]}`},
+		{"an empty execution layer", `{"select":{"branch":"main"},"execution":{"layer":""}}`},
+		{"a whitespace execution layer", `{"select":{"branch":"main"},"execution":{"layer":"  "}}`},
 		{"an unknown sort direction", `{"select":{"branch":"main"},"order":[{"field":"a","dir":"up"}]}`},
 		{"a report level only a Go caller may set", `{"select":{"branch":"main"},"execution":{"report":"warn"}}`},
 		{"an unknown report level", `{"select":{"branch":"main"},"execution":{"report":"everything"}}`},

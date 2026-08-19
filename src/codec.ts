@@ -392,7 +392,9 @@ function contentFromRef(ref: ContentRef | undefined): ContentRef {
  */
 export function parseCreatedAt(s: string): number {
   if (!validRFC3339Nano(s)) {
-    throw new RankeDecodeError(`created_at is not RFC 3339 nanoseconds in UTC: ${s}`)
+    // The wording the other three `V-TIME` fields use, created_at being governed by the
+    // same rule: one message shape for all four, so a reader reports them alike.
+    throw new RankeDecodeError(`a timestamp is not RFC 3339 nanoseconds: created_at=${s}`)
   }
   return Date.parse(s)
 }

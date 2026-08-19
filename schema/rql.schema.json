@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/flocko-motion/ranke-graph/refs/heads/main/spec/rql.schema.json",
   "title": "RankeQL (RQL)",
-  "description": "The query type of RankeQL (RQL), fixed here. This document governs a query's shape: the RankeQL chapter of the Ranke normative specification is still under review, so where the two differ this schema holds and the chapter follows it. The R-Q… ids below cite that chapter as a cross-reference, those ids being stable handles by its own convention. Published with every ranke-graph release at https://github.com/flocko-motion/ranke-graph/releases/latest/download/rql.schema.json. Three classes of rule lie outside a JSON Schema and belong to the implementation: a step's min against its max (R-QSTEPS), head and claim resolving inside the closure (R-QHEAD, R-QANCHOR), and the framing of an id's payload.",
+  "description": "The query type of RankeQL (RQL). A projection of the RankeQL chapter of the Ranke normative specification: the spec is the reading source, this document checks the shapes it names. Where the two disagree, one is a defect — decide which and fix it. The R-Q… ids below cite that chapter, those ids being stable handles by its own convention. Published with every ranke-graph release at https://github.com/flocko-motion/ranke-graph/releases/latest/download/rql.schema.json. Three classes of rule lie outside a JSON Schema and belong to the implementation: a step's min against its max (R-QSTEPS), head and claim resolving inside the closure (R-QHEAD, R-QANCHOR), and the framing of an id's payload.",
 
   "$ref": "#/$defs/Query",
 
@@ -36,15 +36,15 @@
         },
         "head": {
           "$ref": "#/$defs/Id",
-          "description": "The closure read: the query sees closure(head) and nothing outside it. Required under $universe, which confines nothing and so offers no head to fall back on; optional elsewhere, where the scope's own head serves. Given explicitly under a branch or $archive it must resolve to a claim within that scope's closure, so it narrows a query and can never widen it past the grant (R-QHEAD)."
+          "description": "The closure read: the query sees the intersection of the scope's graph and closure(head), so a head narrows a query. Required under $universe, which confines nothing and so offers no head to fall back on, and may name any claim the Universe holds there; optional under every other scope, where the scope's own head serves (R-QHEAD)."
         },
         "claim": {
           "$ref": "#/$defs/Id",
-          "description": "Anchors the walk at one claim, which must lie inside the closure. Absent, the path is unanchored and matches wherever it fits in the closure. The anchor moves where reading begins, never what is visible (R-QANCHOR)."
+          "description": "Anchors the frontier at the single claim it names, which must lie inside the closure. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR)."
         },
         "path": {
           "type": "array",
-          "description": "The traversal, as a frontier pipeline: each step is an independent bounded walk starting from the set of endpoints the previous step produced, and the no-repeat rule applies within a step and resets at each boundary (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier.",
+          "description": "The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier (R-QSTEPS).",
           "items": { "$ref": "#/$defs/PathStep" }
         }
       },
@@ -65,7 +65,7 @@
     "PathStep": {
       "type": "object",
       "additionalProperties": false,
-      "description": "One bounded walk: follow the typed edges in direction dir and yield every claim reached at between min and max hops from the starting set, optionally constrained to nodes types. edges gates every hop; nodes gates the claims a step yields, never those it passes through. A min above a bounded max is refused by the implementation — a JSON Schema cannot compare two sibling values (R-QSTEPS).",
+      "description": "One section of a path. edges bounds the walk: every hop must follow an edge whose type is listed. nodes bounds the answer: a step yields a claim only when its node's type is listed, whatever the nodes it crossed to reach it. min and max bound the hops. A min above a bounded max is refused by the implementation — a JSON Schema cannot compare two sibling values (R-QSTEPS).",
       "properties": {
         "edges": {
           "type": "array",
@@ -204,7 +204,7 @@
     "OutputContent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["max", "overflow"],
+      "required": ["max"],
       "description": "Inline content per claim. Absent, no content is inlined (R-QCONTENT).",
       "properties": {
         "max": {
@@ -215,7 +215,7 @@
         "overflow": {
           "type": "string",
           "enum": ["cutoff", "omit"],
-          "description": "What becomes of content past the cap: cutoff truncates it, omit drops it. A claim keeps every field it carries either way."
+          "description": "What becomes of content past the cap: cutoff inlines the bytes up to it, omit inlines whole values only. Absent, omit. A claim keeps every field it carries either way (R-QCONTENT)."
         }
       }
     },

@@ -30,6 +30,8 @@ github.com/flocko-motion/ranke-go v0.19.1 h1:zBZhVPMyxVhJDz8vo4Y4GsCg9HP6e7kdW0e
 github.com/flocko-motion/ranke-go v0.19.1/go.mod h1:Mx/cYAmJMYfJ5hgq9F1PMjx0PLX/rc6FIMEVPzypxrM=
 github.com/flocko-motion/ranke-go v0.20.0 h1:U4KG+SbE+yavQ7CwuwU45OZw52T31DKKJd2r4h92ftc=
 github.com/flocko-motion/ranke-go v0.20.0/go.mod h1:Mx/cYAmJMYfJ5hgq9F1PMjx0PLX/rc6FIMEVPzypxrM=
+github.com/flocko-motion/ranke-go v0.21.0 h1:orwAYPACyCm0RAGG3xi4ADbu1MO5K7TG76ND10FcC2Q=
+github.com/flocko-motion/ranke-go v0.21.0/go.mod h1:Mx/cYAmJMYfJ5hgq9F1PMjx0PLX/rc6FIMEVPzypxrM=
 github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/klauspost/cpuid/v2 v2.0.4/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
