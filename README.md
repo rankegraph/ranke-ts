@@ -169,6 +169,28 @@ This is the one place the library departs from mirroring ranke-go, whose
 seal a struct; TypeScript gets the same guarantee from `readonly` at no runtime
 cost, and an object per accessor is a cost a browser pays for nothing.
 
+## Content a read withheld
+
+A query inlines no content unless `output.content` asks for it (`R-QCONTENT`), while a
+server states `content_size` either way — so a client always sees that content exists
+and how long it is. A claim served past the cap therefore arrives with a size and no
+bytes, and that is a third state, distinct from having no content at all:
+
+```ts
+const c = claim.content
+
+contentSize(c)      // 4096 — what the content is, not what arrived
+contentHeld(c)      // 0 — what this record carries
+contentComplete(c)  // false — so fetch it, don't render it as empty
+c.kind              // "inline": the bytes were withheld, not addressed elsewhere
+```
+
+`kind` is `inline` because a size with no bytes and no address can only be inline
+content the read withheld: external content always states its address, an address
+being metadata rather than the content a cap applies to. Both encodings resolve this
+the same way — reading it as `none` would collapse "too large, fetch on selection"
+into "this claim has nothing", which is the same answer to two different questions.
+
 ## Record keys
 
 A claim serializes as a CBOR map under the numeric keys `V-SER` fixes, and a tool
