@@ -192,6 +192,37 @@ The codec reads these same constants, which is what makes the exported table the
 one a decode uses. Never transcribe it: a second copy of the numbering is free to
 drift from the encoder, and an id is computed over the encoded bytes.
 
+## Inspecting broken bytes
+
+`decodeClaim` refuses a non-canonical record, which is the right answer for a
+reader and the wrong one for a debugger: a malformed claim is the record you most
+want to look at. `inspectClaim` renders whatever it was given and reports the
+deviations, never throwing.
+
+```ts
+const seen = inspectClaim(bytes)
+
+seen.valid       // false
+seen.claim       // undefined — broken bytes yield no usable claim
+seen.records     // [{ path: "node", at: 2, slots: [...] }, { path: "node.edges[0]", ... }]
+seen.deviations  // [{ path: "node", at: 47, message: "map keys out of canonical order: 1 after 9" }]
+```
+
+Each slot carries its `key`, its `name`, and where its value sits, so a row reads
+`9 (created_at) @114 len 32`.
+
+Two properties worth relying on. **The verdict is the decoder's**: `valid` comes
+from running `decodeClaim`, so this never disagrees with the library that refuses
+the bytes, and `claim` is present only when it accepted them — a violating claim is
+rejected, never handed back. **Recovery follows the encoding, not a chosen depth**:
+a slot whose value will not parse is reported and skipped so later slots still
+render, while a record whose own framing is broken ends there, since without a
+well-formed key there is no way to find the next slot.
+
+A record that is structurally sound but refused on meaning — an unreadable
+timestamp, both content slots — renders in full, with the decoder's message as the
+single account of why.
+
 ## Design
 
 **Zero runtime dependencies.** Everything ships in the package, including
