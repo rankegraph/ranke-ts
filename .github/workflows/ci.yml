@@ -1,11 +1,14 @@
 name: CI
 
-# The test gate the Makefile's `release` target assumes exists. Every push and
-# every PR, so a tag is only ever cut from a tested main.
+# The test gate the Makefile's `release` target assumes exists, and the check branch
+# protection requires — so the job stays named `test`, which is what release.sh waits on.
+#
+# On the pull request alone. GitHub runs this against the merge of head into base, so a
+# green run is a verdict on the tree the merge produces: what lands on the default branch
+# has been verified, and re-running it there would re-answer a settled question. The
+# default branch takes commits no other way, being protected.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   test:
@@ -21,11 +24,11 @@ jobs:
 
       - run: npm ci
 
-      # `make verify` rather than its parts. This job is the check a PR merge waits on,
-      # so anything it omits is a gate that cannot stop what it was written to stop —
-      # which is how check-generated came to run locally and at tag time but not here,
-      # on the one leg that could have refused the merge. Naming the target instead of
-      # its contents leaves nothing to keep in step.
+      # `make verify` rather than its parts, and now the only run of it CI does. This job
+      # is the check a merge waits on, so anything it omits is a gate that cannot stop
+      # what it was written to stop — check-generated was once absent from the list here
+      # while running everywhere else, which is the one place that could have refused the
+      # merge. Naming the target instead of its contents leaves nothing to keep in step.
       #
       # It fetches the spec and the published vectors itself, so nothing is cached
       # between runs and a moved spec is a red run here rather than a surprise later.

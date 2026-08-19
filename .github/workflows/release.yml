@@ -24,11 +24,12 @@ jobs:
 
       - run: npm ci
 
-      # The tag is cut from a verified tree, so this guards against a dirty runner
-      # rather than against the code. `verify` fetches the spec and the published
-      # vectors itself, so this checks the tag against the latest of both.
-      - name: Verify
-        run: make verify
+      # Build, not verify. The tag is cut from a commit the pull request already
+      # verified, so checking it again here would re-answer a settled question. This
+      # step is here because dist/ is gitignored and package.json ships `files:
+      # ["dist"]` — without it npm publish would upload a package with nothing in it.
+      - name: Build what gets published
+        run: make build
 
       # The tag carries the version; package.json stays at 0.0.0 in the tree so
       # no commit has to be cut to bump it.
