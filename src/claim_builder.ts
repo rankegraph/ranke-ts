@@ -284,22 +284,11 @@ function assembleEdges(
   }
 
   checkEdgeCardinality(edges)
-  // §3.5, `V-PROV`: a claim of these classes rests on stated provenance. A
-  // contribution/contributor edge does not satisfy it.
-  if (requiresProvenance(typeClass) && !edges.some((e) => e.record.typeClass === EdgeClassDerivation)) {
-    throw new RankeBuildError(`a ${typeClass}/* claim carries at least one derivation/* edge`)
-  }
-
+  // A derivation, entity or relation claim once had to carry a derivation/* edge. The
+  // spec has retired the rule that said so, and the ADT rules are the definition of
+  // valid, so such a claim is admitted: refusing it would refuse what the ADT permits.
   edges.sort((a, b) => compareBytes(a.id.rawBytes(), b.id.rawBytes()))
   return edges
-}
-
-function requiresProvenance(typeClass: string): boolean {
-  return (
-    typeClass === NodeClassDerivation ||
-    typeClass === NodeClassEntity ||
-    typeClass === NodeClassRelation
-  )
 }
 
 // checkDiffEdgeNames requires a unique, non-empty name on every edge of a diff claim

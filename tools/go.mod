@@ -10,7 +10,7 @@ module github.com/flocko-motion/ranke-ts/tools
 
 go 1.26.2
 
-require github.com/flocko-motion/ranke-go v0.19.1
+require github.com/flocko-motion/ranke-go v0.21.0
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect

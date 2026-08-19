@@ -32,6 +32,8 @@ export type QueryErrorCode =
   | 'ErrQueryWhereForm'
   | 'ErrQueryComparisonForm'
   | 'ErrQueryHops'
+  | 'ErrQueryOrderField'
+  | 'ErrQueryLayerName'
   | 'ErrQueryEnum'
   // A bound and an enumeration fail differently, and a caller switching on the code
   // reads ErrQueryEnum as a mistyped string.
@@ -351,7 +353,11 @@ function validateOrder(order: Order): void {
     checkString(`order[${i}].compare`, key.compare)
     checkString(`order[${i}].dir`, key.dir)
     if (key.field === undefined || key.field === '') {
-      throw new RankeQueryError('ErrQueryEnum', `order[${i}].field`, 'a sort key names a field')
+      throw new RankeQueryError(
+        'ErrQueryOrderField',
+        `order[${i}]`,
+        'a sort key names the field it orders on',
+      )
     }
     oneOf(`order[${i}].compare`, key.compare, COLLATIONS)
     oneOf(`order[${i}].dir`, key.dir, DIRECTIONS)
@@ -389,6 +395,15 @@ function validateExecution(exec: Execution): void {
   checkObject('execution', exec, KEYS.execution)
   checkString('execution.layer', exec.layer)
   checkString('execution.report', exec.report)
+  // An absent layer leaves the backend to choose; a stated one names a layer, and
+  // whitespace states a name and gives none (`R-QLAYER`, the schema's minLength 1).
+  if (exec.layer !== undefined && exec.layer.trim() === '') {
+    throw new RankeQueryError(
+      'ErrQueryLayerName',
+      'execution.layer',
+      'execution.layer names a layer, so a stated one may not be empty',
+    )
+  }
   oneOf('execution.report', exec.report, REPORTS)
 }
 

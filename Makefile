@@ -48,6 +48,10 @@ generate:
 
 # Refuses a release whose generated Query type no longer matches the committed
 # schema — the artifact and its source must move together.
+#
+# WRITES to the tree: `generate` rewrites src/query.ts before the diff, so a run that
+# fails leaves the regenerated file in place, which is the point — the diff is the
+# report. A run that passes rewrites it byte-identically and leaves the tree clean.
 check-generated: generate
 	@git diff --quiet -- src/query.ts || { \
 		echo "src/query.ts is stale — run 'make generate' and commit the result" >&2; \
@@ -81,7 +85,11 @@ rule-citations:
 #
 # Needs the spec: rule-citations reads $(PAPERS_DIR), which is gitignored, so a bare
 # checkout fails the gate rather than passing it blind.
-verify: typecheck test build rule-citations
+#
+# check-generated is here because it was documented as a release gate and run by
+# nothing — not verify, not release, not CI. A guarantee no target enforces is a
+# comment. It WRITES src/query.ts; see its own note above.
+verify: typecheck test build check-generated rule-citations
 
 # The version, which is the latest release tag: package.json carries 0.0.0 in the tree
 # and the release workflow stamps the tag's number in just before publishing. `--match`

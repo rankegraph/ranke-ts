@@ -361,17 +361,19 @@ test('a claim other than a root contributor states a contributor', () => {
   assert.throws(() => newClaim({ type: 'source/note', createdAt: AT_ROOT }), RankeBuildError)
 })
 
-// §3.5: a derivation, entity or relation claim rests on stated provenance.
-test('the provenance invariant is enforced', () => {
-  for (const type of ['derivation/summary', 'entity/person', 'relation/family']) {
-    assert.throws(
-      () => newClaim({ type, contributor: root(), createdAt: AT_ROOT, height: 1 }),
-      RankeBuildError,
-      type,
+// A derivation, entity or relation claim once had to carry a derivation/* edge, and the
+// spec has retired the rule. The ADT rules are the definition of valid, so a claim with
+// no provenance edge is admitted — the builder refusing it would refuse a valid claim.
+test('a claim with no provenance edge is admitted', () => {
+  for (const type of ['derivation/summary', 'entity/person', 'relation/family', 'source/note']) {
+    const built = newClaim({ type, contributor: root(), createdAt: AT_ROOT, height: 1 })
+    assert.equal(built.claim.type, type)
+    assert.equal(
+      built.claim.edges.filter((e) => e.typeClass === 'derivation').length,
+      0,
+      `${type} carries no derivation edge`,
     )
   }
-  // A source rests on nothing, so it needs no derivation edge.
-  newClaim({ type: 'source/note', contributor: root(), createdAt: AT_ROOT, height: 1 })
 })
 
 test('content and its encoding travel together', () => {

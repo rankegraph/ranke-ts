@@ -77,10 +77,14 @@ the bare digest — that is what ranke-go signs, so a WebCrypto caller must pass
 those bytes through unchanged.
 
 The builder enforces what construction can: the type vocabularies, the
-inline-or-addressed content rule with its mandatory encoding, the §3.5 provenance
-invariant, one contributor edge and one diff edge, named edges on a diff claim,
-the canonical edge order, R-DPLANNED on an edge whose target is scheduled, and that a
-claim declaring a key cannot identity-sign.
+inline-or-addressed content rule with its mandatory encoding, one contributor edge
+and one diff edge, named edges on a diff claim, the canonical edge order,
+R-DPLANNED on an edge whose target is scheduled, and that a claim declaring a key
+cannot identity-sign.
+
+It does not require a derivation, entity or relation claim to carry a
+`derivation/*` edge. A retired rule said so; the spec's ADT rules are the
+definition of valid, and none of them says it now.
 
 ## Queries
 
@@ -164,6 +168,60 @@ This is the one place the library departs from mirroring ranke-go, whose
 `Claim`, `Node` and `Edge` are interfaces with methods. Go needs an interface to
 seal a struct; TypeScript gets the same guarantee from `readonly` at no runtime
 cost, and an object per accessor is a cost a browser pays for nothing.
+
+## Record keys
+
+A claim serializes as a CBOR map under the numeric keys `V-SER` fixes, and a tool
+rendering those bytes needs them by name. `record_keys.ts` exports the table:
+
+```ts
+import { NodeRecordKeys, EdgeRecordKeys, recordKeyName } from '@flocko-motion/ranke'
+
+NodeRecordKeys.get(9)            // "created_at"
+NodeRecordKeys.get(6)            // "content"
+EdgeRecordKeys.get(12)           // "reference"
+recordKeyName('node', 12)        // undefined — 12 is an edge slot
+recordKeyName('edge', 14)        // undefined — no such slot yet
+```
+
+Keys 1 to 8 are the slots a node and an edge share, so one number means one thing
+in either record; a node then takes 9 to 11 and an edge 12 to 13. An unassigned
+number has no name, so a reader shows it as the number rather than guessing.
+
+The codec reads these same constants, which is what makes the exported table the
+one a decode uses. Never transcribe it: a second copy of the numbering is free to
+drift from the encoder, and an id is computed over the encoded bytes.
+
+## Inspecting broken bytes
+
+`decodeClaim` refuses a non-canonical record, which is the right answer for a
+reader and the wrong one for a debugger: a malformed claim is the record you most
+want to look at. `inspectClaim` renders whatever it was given and reports the
+deviations, never throwing.
+
+```ts
+const seen = inspectClaim(bytes)
+
+seen.valid       // false
+seen.claim       // undefined — broken bytes yield no usable claim
+seen.records     // [{ path: "node", at: 2, slots: [...] }, { path: "node.edges[0]", ... }]
+seen.deviations  // [{ path: "node", at: 47, message: "map keys out of canonical order: 1 after 9" }]
+```
+
+Each slot carries its `key`, its `name`, and where its value sits, so a row reads
+`9 (created_at) @114 len 32`.
+
+Two properties worth relying on. **The verdict is the decoder's**: `valid` comes
+from running `decodeClaim`, so this never disagrees with the library that refuses
+the bytes, and `claim` is present only when it accepted them — a violating claim is
+rejected, never handed back. **Recovery follows the encoding, not a chosen depth**:
+a slot whose value will not parse is reported and skipped so later slots still
+render, while a record whose own framing is broken ends there, since without a
+well-formed key there is no way to find the next slot.
+
+A record that is structurally sound but refused on meaning — an unreadable
+timestamp, both content slots — renders in full, with the decoder's message as the
+single account of why.
 
 ## Design
 

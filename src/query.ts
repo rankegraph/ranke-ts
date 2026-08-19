@@ -20,15 +20,15 @@ export type Select = {
    */
   branch: string;
   /**
-   * The closure read: the query sees closure(head) and nothing outside it. Required under $universe, which confines nothing and so offers no head to fall back on; optional elsewhere, where the scope's own head serves. Given explicitly under a branch or $archive it must resolve to a claim within that scope's closure, so it narrows a query and can never widen it past the grant (R-QHEAD).
+   * The closure read: the query sees the intersection of the scope's graph and closure(head), so a head narrows a query. Required under $universe, which confines nothing and so offers no head to fall back on, and may name any claim the Universe holds there; optional under every other scope, where the scope's own head serves (R-QHEAD).
    */
   head?: string;
   /**
-   * Anchors the walk at one claim, which must lie inside the closure. Absent, the path is unanchored and matches wherever it fits in the closure. The anchor moves where reading begins, never what is visible (R-QANCHOR).
+   * Anchors the frontier at the single claim it names, which must lie inside the closure. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR).
    */
   claim?: string;
   /**
-   * The traversal, as a frontier pipeline: each step is an independent bounded walk starting from the set of endpoints the previous step produced, and the no-repeat rule applies within a step and resets at each boundary (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier.
+   * The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier (R-QSTEPS).
    */
   path?: PathStep[];
 };
@@ -83,7 +83,7 @@ export interface Query {
   execution?: Execution;
 }
 /**
- * One bounded walk: follow the typed edges in direction dir and yield every claim reached at between min and max hops from the starting set, optionally constrained to nodes types. edges gates every hop; nodes gates the claims a step yields, never those it passes through. A min above a bounded max is refused by the implementation — a JSON Schema cannot compare two sibling values (R-QSTEPS).
+ * One section of a path. edges bounds the walk: every hop must follow an edge whose type is listed. nodes bounds the answer: a step yields a claim only when its node's type is listed, whatever the nodes it crossed to reach it. min and max bound the hops. A min above a bounded max is refused by the implementation — a JSON Schema cannot compare two sibling values (R-QSTEPS).
  */
 export interface PathStep {
   /**
@@ -157,9 +157,9 @@ export interface OutputContent {
    */
   max: number;
   /**
-   * What becomes of content past the cap: cutoff truncates it, omit drops it. A claim keeps every field it carries either way.
+   * What becomes of content past the cap: cutoff inlines the bytes up to it, omit inlines whole values only. Absent, omit. A claim keeps every field it carries either way (R-QCONTENT).
    */
-  overflow: "cutoff" | "omit";
+  overflow?: "cutoff" | "omit";
 }
 export interface OrderKey {
   /**
