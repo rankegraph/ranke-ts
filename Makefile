@@ -4,7 +4,7 @@
 
 .PHONY: all install test typecheck build clean testdata-clean verify release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
-	rule-citations major minor patch breaking feature fix
+	spec rule-citations major minor patch breaking feature fix
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -80,16 +80,31 @@ testdata-clean:
 rule-citations:
 	@./scripts/rule-citations.sh
 
+# Bring the papers up to ranke-graph's tip, cloning only when it has moved. There are
+# only two ways to have a spec to check against — fetch it, or track a copy — and
+# tracking a copy of a document that lives in a sibling repo duplicates it for nothing.
+# So `verify` fetches, which is what makes it a check against the LATEST spec rather
+# than against whenever someone last pulled. Establishing what the latest is costs 40
+# bytes where taking it costs 1.8 MB, so the two are separated: see scripts/fetch-spec.sh.
+spec:
+	@./scripts/fetch-spec.sh
+
 # The gate a release must pass. ranke-go splits the fast checks from its full
 # suite; here the whole lot runs in under a second, so `verify` is `all`.
 #
-# Needs the spec: rule-citations reads $(PAPERS_DIR), which is gitignored, so a bare
-# checkout fails the gate rather than passing it blind.
+# It checks against the LATEST spec and the LATEST published vectors, taking both
+# before it checks anything: a spec that moved while this code did not means the code
+# is broken, and that is the finding rather than a false alarm. Both live behind
+# gitignored caches — $(PAPERS_DIR) and testdata/ — neither of which expires, so
+# without dropping them a run reports on whatever was fetched once, however long ago.
+#
+# The cost is that `verify` needs the network. Offline, name local copies instead:
+#   make verify RANKE_SPEC=path/to/spec.typ RANKE_TESTDATA_DIR=path/to/vectors
 #
 # check-generated is here because it was documented as a release gate and run by
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
-verify: typecheck test build check-generated rule-citations
+verify: spec testdata-clean typecheck test build check-generated rule-citations
 
 # The version, which is the latest release tag: package.json carries 0.0.0 in the tree
 # and the release workflow stamps the tag's number in just before publishing. `--match`

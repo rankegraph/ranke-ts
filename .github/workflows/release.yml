@@ -24,14 +24,9 @@ jobs:
 
       - run: npm ci
 
-      # `make verify` runs the rule-citation gate, which reads the spec from
-      # ranke-graph. Fetched rather than skipped: a gate that cannot see the spec
-      # cannot check it, and verify fails without it.
-      - name: Fetch the spec
-        run: make docs
-
-      # The tag is cut from a verified tree, so this guards against a dirty
-      # runner rather than against the code.
+      # The tag is cut from a verified tree, so this guards against a dirty runner
+      # rather than against the code. `verify` fetches the spec and the published
+      # vectors itself, so this checks the tag against the latest of both.
       - name: Verify
         run: make verify
 
