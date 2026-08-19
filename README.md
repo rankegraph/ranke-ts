@@ -77,10 +77,14 @@ the bare digest — that is what ranke-go signs, so a WebCrypto caller must pass
 those bytes through unchanged.
 
 The builder enforces what construction can: the type vocabularies, the
-inline-or-addressed content rule with its mandatory encoding, the §3.5 provenance
-invariant, one contributor edge and one diff edge, named edges on a diff claim,
-the canonical edge order, R-DPLANNED on an edge whose target is scheduled, and that a
-claim declaring a key cannot identity-sign.
+inline-or-addressed content rule with its mandatory encoding, one contributor edge
+and one diff edge, named edges on a diff claim, the canonical edge order,
+R-DPLANNED on an edge whose target is scheduled, and that a claim declaring a key
+cannot identity-sign.
+
+It does not require a derivation, entity or relation claim to carry a
+`derivation/*` edge. A retired rule said so; the spec's ADT rules are the
+definition of valid, and none of them says it now.
 
 ## Queries
 
