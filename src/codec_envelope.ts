@@ -78,12 +78,29 @@ export function encodeEnvelope(payload: Uint8Array, signature: Uint8Array): Uint
   return out
 }
 
+/** EnvelopeParts is an envelope taken apart, with where each piece sits in the bytes. */
+export interface EnvelopeParts {
+  readonly payload: Uint8Array
+  /** Offset of the payload's first byte, for a reader pointing at what it renders. */
+  readonly payloadAt: number
+  readonly signature: Uint8Array
+  readonly signatureAt: number
+}
+
 /**
  * envelopePayload returns the serialized claim an envelope carries, refusing bytes of any
  * other shape — which is how content is told from a claim, and how a record with a spare
  * header is refused rather than given an id of its own.
  */
 export function envelopePayload(raw: Uint8Array): Uint8Array {
+  return envelopeParts(raw).payload
+}
+
+/**
+ * envelopeParts is envelopePayload with the offsets kept, for a reader that renders the
+ * bytes rather than only reading them.
+ */
+export function envelopeParts(raw: Uint8Array): EnvelopeParts {
   let at = 0
   const want = (byte: number, what: string): void => {
     if (raw[at] !== byte) {
@@ -118,7 +135,12 @@ export function envelopePayload(raw: Uint8Array): Uint8Array {
     throw new RankeEnvelopeError(`${raw.length - signature.next} trailing byte(s)`)
   }
   if (payload.bytes.length === 0) throw new RankeEnvelopeError('the envelope carries no payload')
-  return payload.bytes
+  return Object.freeze({
+    payload: payload.bytes,
+    payloadAt: payload.next - payload.bytes.length,
+    signature: signature.bytes,
+    signatureAt: signature.next - signature.bytes.length,
+  })
 }
 
 // readByteString reads a definite-length CBOR byte string, in the shortest form canonical

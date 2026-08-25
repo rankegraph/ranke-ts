@@ -29,6 +29,12 @@ const MT_BYTES = 2
 const MT_TEXT = 3
 const MT_ARRAY = 4
 const MT_MAP = 5
+// Major 6 is a tag. A claim record carries none, but an envelope IS one (`V-ENV`), and a
+// stream can carry envelopes — so the walker measures tag 18 to find a record boundary and
+// refuses every other tag.
+const MT_TAG = 6
+const TAG_COSE_SIGN1 = 18
+
 // Major 7 holds simple values and floats. A claim record uses none of it, but a
 // result sequence also carries an execution report, and a report has booleans — so
 // exactly false, true and null are admitted and every float is refused.
@@ -305,6 +311,9 @@ export class CborReader {
           this.#skip()
         }
         return
+      case MT_TAG:
+        this.#skip() // the tagged value: an envelope's four-element array
+        return
       default:
         throw new RankeCborError(`major type ${major} has no place in a ranke record`)
     }
@@ -322,6 +331,15 @@ export class CborReader {
         throw new RankeCborError(
           `major type 7 carries only false, true and null here, got additional information ${ai}`,
         )
+      }
+      return { major, arg: BigInt(ai) }
+    }
+    // A tag has no place in a ranke RECORD, but a stream carries envelopes, which are
+    // tagged (`V-ENV`). So the walker measures one to find a record boundary, and only
+    // tag 18: any other tag is a value this format does not have.
+    if (major === MT_TAG) {
+      if (ai !== TAG_COSE_SIGN1) {
+        throw new RankeCborError(`tag ${ai} has no place in a ranke stream`)
       }
       return { major, arg: BigInt(ai) }
     }

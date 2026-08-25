@@ -332,6 +332,19 @@
       "accepted": true
     },
     {
+      "label": "an envelope read, the only output a client can hash against an id",
+      "query": {
+        "select": {
+          "branch": "main"
+        },
+        "output": {
+          "detail": "envelope",
+          "encoding": "cbor"
+        }
+      },
+      "accepted": true
+    },
+    {
       "label": "a path-less claim anchors the frontier",
       "query": {
         "select": {
@@ -771,6 +784,42 @@
         "ErrQueryLayerName"
       ],
       "detail": "ranke.Query: execution.layer names a layer, so a stated one may not be empty: execution.layer"
+    },
+    {
+      "label": "an envelope read asking to materialize",
+      "query": {
+        "select": {
+          "branch": "main"
+        },
+        "output": {
+          "detail": "envelope",
+          "form": "materialized"
+        }
+      },
+      "accepted": false,
+      "code": "ErrQueryEnvelopeAxis",
+      "codes": [
+        "ErrQueryEnvelopeAxis"
+      ],
+      "detail": "ranke.Query: detail envelope returns the stored bytes, which this axis would have to change (`R-QDETAIL`): output.form materialized"
+    },
+    {
+      "label": "an envelope read asking for json",
+      "query": {
+        "select": {
+          "branch": "main"
+        },
+        "output": {
+          "detail": "envelope",
+          "encoding": "json"
+        }
+      },
+      "accepted": false,
+      "code": "ErrQueryEnvelopeAxis",
+      "codes": [
+        "ErrQueryEnvelopeAxis"
+      ],
+      "detail": "ranke.Query: detail envelope returns the stored bytes, which this axis would have to change (`R-QDETAIL`): output.encoding json"
     },
     {
       "label": "an unknown sort direction",

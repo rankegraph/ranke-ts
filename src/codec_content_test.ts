@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { decodeClaim } from './codec.ts'
+import { decodeSerializedClaim } from './codec.ts'
 import { decodeClaimJSON, type WireClaim } from './codec_json.ts'
 import { contentComplete, contentHeld, contentSize, inlineBytes } from './content.ts'
 import { type Capped, capped, cborBytes } from './testing/fixtures.ts'
@@ -16,12 +16,27 @@ function find(label: string): Capped {
   return c
 }
 
-test('every content option ranke-go serves decodes', () => {
+// A served record is a serialized claim (`R-QDETAIL`), not an envelope, so it decodes
+// through decodeSerializedClaim — and no id covers it, which is what `R-QCANON` means by
+// `detail: claims` carrying no such guarantee.
+const served = (c: Capped) => decodeSerializedClaim(cborBytes(c), c.id).content
+
+/** heldInJson reads the same record's inlined length off the projection. */
+function heldInJson(c: Capped): number {
+  const raw = (c.json as Record<string, unknown>).content
+  return typeof raw === 'string' ? Buffer.from(raw, 'base64').length : 0
+}
+
+// The generator no longer records what the record holds, ranke-go exporting no decoder for
+// a payload. It does not need to: the same record is emitted in both encodings, so the two
+// readings are each other's oracle, and a decoder wrong about one would have to be wrong
+// about the other in exactly the same way to pass.
+test('every content option ranke-go serves decodes, and both encodings agree', () => {
   assert.ok(capped.length >= 6, 'the generator covers each option `R-QCONTENT` admits')
   for (const c of capped) {
-    const claim = decodeClaim(cborBytes(c), c.id)
-    assert.equal(contentHeld(claim.content), c.inline, `${c.label}: bytes held`)
-    assert.equal(inlineBytes(claim.content)?.length, c.inline, `${c.label}: the bytes themselves`)
+    const held = contentHeld(served(c))
+    assert.equal(held, heldInJson(c), `${c.label}: the two encodings hold the same count`)
+    assert.equal(inlineBytes(served(c))?.length ?? 0, held, `${c.label}: the bytes themselves`)
   }
 })
 
@@ -29,9 +44,7 @@ test('every content option ranke-go serves decodes', () => {
 // length would leave the shortfall unrecoverable, and the record unverifiable.
 test('a capped claim declares the content length, not the prefix length', () => {
   for (const c of capped) {
-    const claim = decodeClaim(cborBytes(c), c.id)
-    assert.equal(contentSize(claim.content), c.size, `${c.label}: content_size`)
-    assert.equal(c.declared, c.size, `${c.label}: ranke-go declared the full length`)
+    assert.equal(contentSize(served(c)), c.size, `${c.label}: content_size`)
   }
 })
 
@@ -39,56 +52,50 @@ test('a capped claim declares the content length, not the prefix length', () => 
 // as whole content, so only the comparison tells them apart.
 test('contentComplete tells a prefix from the whole content', () => {
   for (const c of capped) {
-    const claim = decodeClaim(cborBytes(c), c.id)
     assert.equal(
-      contentComplete(claim.content),
-      c.inline === c.size,
-      `${c.label}: held ${c.inline} of ${c.size}`,
+      contentComplete(served(c)),
+      contentHeld(served(c)) === c.size,
+      `${c.label}: held ${contentHeld(served(c))} of ${c.size}`,
     )
   }
   // Both partial cases must be visible as partial: one holding some bytes, one none.
-  const partial = capped.filter((c) => c.inline < c.size)
+  const partial = capped.filter((c) => contentHeld(served(c)) < c.size)
   assert.ok(
-    partial.some((c) => c.inline > 0) && partial.some((c) => c.inline === 0),
+    partial.some((c) => contentHeld(served(c)) > 0) &&
+      partial.some((c) => contentHeld(served(c)) === 0),
     'the fixtures cover a cut prefix and a content held back entirely',
   )
   for (const c of partial) {
-    assert.equal(contentComplete(decodeClaim(cborBytes(c), c.id).content), false, c.label)
+    assert.equal(contentComplete(served(c)), false, c.label)
   }
 })
 
-// `R-QCANON`: content in full is the only output form a client can hash and check
-// against the id, since those are the bytes S(v) the id was computed over.
-test('content in full is the record whose hash is the id', () => {
+// Content in full is the whole content in the record a read served. It is NOT the form a
+// client hashes against the id: `R-QCANON` moved that to `detail: envelope`, and says
+// outright that the id covers the envelope, not the payload inside it.
+test('content in full holds every byte', () => {
   const full = find('max 0, content in full')
-  const claim = decodeClaim(cborBytes(full), full.id)
-  assert.equal(contentHeld(claim.content), full.size, 'every byte arrived')
-  assert.ok(contentComplete(claim.content))
-  assert.equal(claim.id, full.id)
+  assert.equal(contentHeld(served(full)), full.size, 'every byte arrived')
+  assert.ok(contentComplete(served(full)))
 })
 
 // A record holding none of its content still declares it, reading as "inline, nothing
 // held" — which is what lets a client ask again.
 test('an absent content section inlines nothing', () => {
   const none = find('content absent, so none is inlined')
-  assert.equal(none.inline, 0, 'ranke-go inlined none of it')
-  const claim = decodeClaim(cborBytes(none), none.id)
-  assert.equal(contentHeld(claim.content), 0)
-  assert.equal(claim.content.kind, 'inline', 'content exists; this record holds none of it')
-  assert.equal(contentComplete(claim.content), false)
-  assert.equal(contentSize(claim.content), none.size)
+  assert.equal(contentHeld(served(none)), 0, 'ranke-go inlined none of it')
+  assert.equal(served(none).kind, 'inline', 'content exists; this record holds none of it')
+  assert.equal(contentComplete(served(none)), false)
+  assert.equal(contentSize(served(none)), none.size)
 })
 
 test('cutoff delivers a prefix of the content, omit none of the value', () => {
   const cut = find('a cap the content overruns, cut at it')
-  assert.equal(cut.inline, cut.cap, 'cut exactly at the cap')
-  const cutClaim = decodeClaim(cborBytes(cut), cut.id)
-  assert.equal(contentHeld(cutClaim.content), cut.cap)
-  assert.equal(contentComplete(cutClaim.content), false, 'a prefix is not the content')
+  assert.equal(contentHeld(served(cut)), cut.cap, 'cut exactly at the cap')
+  assert.equal(contentComplete(served(cut)), false, 'a prefix is not the content')
 
   const omitted = find('a cap the content overruns, omitted whole')
-  assert.equal(omitted.inline, 0)
-  assert.equal(contentHeld(decodeClaim(cborBytes(omitted), omitted.id).content), 0)
+  assert.equal(contentHeld(served(omitted)), 0)
 })
 
 // An absent overflow is omit (`R-QCONTENT`), so the two must serve the same bytes.
@@ -99,7 +106,7 @@ test('an absent overflow serves what omit serves', () => {
 
 test('a cap the content fits leaves it whole', () => {
   const fits = find('a cap the content fits')
-  assert.equal(fits.inline, fits.size)
+  assert.equal(contentHeld(served(fits)), fits.size)
   assert.equal(fits.cbor, find('max 0, content in full').cbor,
     'a cap nothing overruns serves the record in full')
 })
@@ -109,9 +116,7 @@ test('a cap the content fits leaves it whole', () => {
 test('the JSON projection caps content alike', () => {
   for (const c of capped) {
     const m = c.json as Record<string, unknown>
-    const raw = m.content
-    const inlined = typeof raw === 'string' ? Buffer.from(raw, 'base64').length : 0
-    assert.equal(inlined, c.inline, `${c.label}: json content`)
+    assert.equal(heldInJson(c), contentHeld(served(c)), `${c.label}: json content`)
     assert.equal(m.content_size, c.size, `${c.label}: json content_size`)
   }
 })
@@ -122,7 +127,7 @@ test('the JSON projection caps content alike', () => {
 // claim whose body a cap withheld.
 test('both decode paths agree on every content option', () => {
   for (const c of capped) {
-    const fromCbor = decodeClaim(cborBytes(c), c.id).content
+    const fromCbor = served(c)
     const fromJson = decodeClaimJSON(c.json as WireClaim).content
     assert.equal(fromJson.kind, fromCbor.kind, `${c.label}: kind`)
     assert.equal(contentSize(fromJson), contentSize(fromCbor), `${c.label}: size`)
@@ -135,11 +140,11 @@ test('both decode paths agree on every content option', () => {
 // held, and it is not complete — which is what lets a caller tell "too large, fetch it on
 // selection" from "this claim has no content", the two a lost size collapses into one.
 test('a withheld body keeps its size in both encodings', () => {
-  const withheld = capped.filter((c) => c.inline === 0)
+  const withheld = capped.filter((c) => contentHeld(served(c)) === 0)
   assert.equal(withheld.length, 3, 'the options that serve a size and no bytes')
   for (const c of withheld) {
     for (const [via, ref] of [
-      ['cbor', decodeClaim(cborBytes(c), c.id).content],
+      ['cbor', served(c)],
       ['json', decodeClaimJSON(c.json as WireClaim).content],
     ] as const) {
       assert.equal(contentSize(ref), c.size, `${c.label} via ${via}: the size is stated`)

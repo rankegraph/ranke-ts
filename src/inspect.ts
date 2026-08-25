@@ -16,8 +16,8 @@
 
 import type { Claim } from './claim.ts'
 import { decodeClaim, type DecodeOptions } from './codec.ts'
+import { envelopeParts } from './codec_envelope.ts'
 import {
-  ClaimFileKeyNode,
   NodeKeyEdges,
   type RecordKind,
   recordKeyName,
@@ -83,14 +83,14 @@ export function inspectClaim(bytes: Uint8Array, opts: DecodeOptions = {}): Claim
   const records: InspectedRecord[] = []
   const deviations: Deviation[] = []
 
-  const outer = walkRecord(bytes, 0, 'claim', deviations)
-  const nodeSlot = outer.find((s) => s.key === ClaimFileKeyNode)
-  if (nodeSlot === undefined) {
-    if (outer.length > 0) {
-      deviations.push({ at: 0, path: 'claim', message: 'the claim carries no node record' })
-    }
-  } else {
-    inspectNode(bytes, nodeSlot, records, deviations)
+  // The envelope first (`V-ENV`), the record a reader wants being its payload. A frame
+  // that will not parse is the case this whole module exists for, so its complaint is a
+  // deviation like any other rather than an exception.
+  try {
+    const parts = envelopeParts(bytes)
+    inspectPayload(bytes, parts.payloadAt, parts.payload.length, records, deviations)
+  } catch (err) {
+    deviations.push({ at: 0, path: 'envelope', message: (err as Error).message })
   }
 
   // The verdict is the decoder's, so this module never disagrees with the library that
@@ -118,13 +118,13 @@ export function inspectClaim(bytes: Uint8Array, opts: DecodeOptions = {}): Claim
 }
 
 // inspectNode renders the node record and each edge inlined under its edges slot.
-function inspectNode(
+function inspectPayload(
   bytes: Uint8Array,
-  nodeSlot: InspectedSlot,
+  at: number,
+  _length: number,
   records: InspectedRecord[],
   deviations: Deviation[],
 ): void {
-  const at = valueStart(bytes, nodeSlot)
   const slots = walkRecord(bytes, at, 'node', deviations)
   records.push(Object.freeze({ kind: 'node', path: 'node', at, slots: Object.freeze(slots) }))
 

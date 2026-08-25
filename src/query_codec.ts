@@ -34,6 +34,7 @@ export type QueryErrorCode =
   | 'ErrQueryHops'
   | 'ErrQueryOrderField'
   | 'ErrQueryLayerName'
+  | 'ErrQueryEnvelopeAxis'
   | 'ErrQueryEnum'
   // A bound and an enumeration fail differently, and a caller switching on the code
   // reads ErrQueryEnum as a mistyped string.
@@ -73,7 +74,7 @@ const DIRS = ['provenance', 'uses', 'connections'] as const
 const SHAPES = ['single', 'path'] as const
 // "graph" asked for the closed graph, a claim cut down to the edges among the results,
 // so `R-QDETAIL` dropped it: id or claims.
-const DETAILS = ['id', 'claims'] as const
+const DETAILS = ['id', 'claims', 'envelope'] as const
 const FORMS = ['original', 'materialized'] as const
 // Three values the schema excludes because only a Go caller may set them: the native
 // encoding asks for Go objects, and report's error and warn are Go-side thresholds.
@@ -333,6 +334,27 @@ function validateOutput(o: Output): void {
   oneOf('output.detail', o.detail, DETAILS)
   oneOf('output.form', o.form, FORMS)
   oneOf('output.encoding', o.encoding, ENCODINGS)
+  // `detail: envelope` returns the stored bytes copied, so neither axis that would rebuild
+  // them applies: a materialised claim is not the record the id covers, and JSON is not
+  // the encoding it was stored in (`R-QDETAIL`, `R-QCANON`).
+  // One code for both, as ranke-go has one sentinel: a caller switching on it reads "an
+  // axis that would have to change the bytes", which is the single reason either fails.
+  if (o.detail === 'envelope') {
+    if (o.form === 'materialized') {
+      throw new RankeQueryError(
+        'ErrQueryEnvelopeAxis',
+        'output.form',
+        'detail: envelope returns the stored bytes, which no materialised view can be',
+      )
+    }
+    if (o.encoding === 'json') {
+      throw new RankeQueryError(
+        'ErrQueryEnvelopeAxis',
+        'output.encoding',
+        'detail: envelope returns the stored bytes, which are CBOR',
+      )
+    }
+  }
   if (o.content === undefined) return
   checkObject('output.content', o.content, KEYS.content)
   checkInt('output.content.max', o.content.max)
