@@ -4,7 +4,7 @@
 
 .PHONY: all install test typecheck build clean verify check release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
-	spec rule-citations major minor patch breaking feature fix
+	spec ranke-go-check rule-citations major minor patch breaking feature fix
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -93,6 +93,13 @@ rule-citations:
 spec:
 	@./scripts/fetch-spec.sh
 
+# ranke-go is the reference this library mirrors, so `verify` holds the pin to its latest
+# release and the fixtures to the pin. Asked of the module proxy over HTTP, so a freshness
+# question does not drag in the Go toolchain that keeps `fixtures` out of `verify`.
+#   make ranke-go-check RANKE_GO_LATEST=v0.24.0   # offline, or ahead of a release
+ranke-go-check:
+	@./scripts/check-ranke-go.sh
+
 # The gate a release must pass. ranke-go splits the fast checks from its full
 # suite; here the whole lot runs in under a second, so `verify` is `all`.
 #
@@ -107,7 +114,7 @@ spec:
 # check-generated is here because it was documented as a release gate and run by
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
-verify: spec typecheck test build check-generated rule-citations
+verify: spec ranke-go-check typecheck test build check-generated rule-citations
 
 # The conventional name for the gate above — an alias, so both spellings run the
 # same checks and neither can drift from the other.
