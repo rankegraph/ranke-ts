@@ -1,0 +1,3 @@
+github:
+    issues: true
+verify: make check

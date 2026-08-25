@@ -2,7 +2,7 @@
 #
 # Thin wrapper over the npm scripts, so the targets match ranke-go's.
 
-.PHONY: all install test typecheck build clean testdata-clean verify release fixtures \
+.PHONY: all install test typecheck build clean testdata-clean verify check release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
 	spec rule-citations major minor patch breaking feature fix
 
@@ -17,6 +17,14 @@ all: typecheck test build
 
 install:
 	npm install
+
+# The stamp a fresh clone is missing: tsc and json2ts live here, and npm run /
+# npx resolve neither without it. Keyed on the lockfile, via `npm ci` rather than
+# `install`'s `npm install`, so this reproduces the exact versions CI checks out —
+# and reinstalls only when the lockfile actually moved, not on every invocation.
+node_modules: package-lock.json
+	npm ci
+	@touch node_modules
 
 # Node strips types, so the sources run as they are — no build before a test. The
 # script adds a floor: `node --test` exits 0 when its glob matches nothing.
@@ -43,7 +51,7 @@ bench:
 pull-rql-schema:
 	@./scripts/pull-rql-schema.sh
 
-generate:
+generate: node_modules
 	@./scripts/generate.sh
 
 # Refuses a release whose generated Query type no longer matches the committed
@@ -59,10 +67,10 @@ check-generated: generate
 	}
 
 # Covers the tests too, which the build config excludes.
-typecheck:
+typecheck: node_modules
 	npm run typecheck
 
-build:
+build: node_modules
 	npm run build
 
 clean:
@@ -105,6 +113,10 @@ spec:
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
 verify: spec testdata-clean typecheck test build check-generated rule-citations
+
+# The conventional name for the gate above — an alias, so both spellings run the
+# same checks and neither can drift from the other.
+check: verify
 
 # The version, which is the latest release tag: package.json carries 0.0.0 in the tree
 # and the release workflow stamps the tag's number in just before publishing. `--match`
