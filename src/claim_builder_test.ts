@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createPrivateKey, createPublicKey, sign } from 'node:crypto'
 
 import {
   type ClaimInput,
@@ -7,88 +8,152 @@ import {
   contributorFrom,
   edgeIdOf,
   heightOf,
-  newClaim,
+  newClaim as buildClaim,
   newEdge,
   normalizeCreatedAt,
 } from './claim_builder.ts'
-import { decodeClaim, nodePreimage } from './codec.ts'
+import { decodeClaim } from './codec.ts'
 import { hashContent, idFromBytes, parseId } from './id.ts'
 import * as fx from './testing/fixtures.ts'
 
-// An identity Sign makes the id the hash of the claim itself, so these are the cases
-// a keyless implementation can reproduce whole. ranke-go built them; if this builder
-// arrives at the same ids, it agrees on the type resolution, the contributor edge, the
-// canonical edge order, the field ordering and every byte of S(v) at once.
+// ranke-go built the fixtures; if this builder arrives at the same ids, it agrees on the
+// type resolution, the contributor edge, the canonical edge order, the field ordering, the
+// envelope framing and every byte of S(v) at once.
+//
+// Every claim is signed (`V-SIG`), so a rebuild needs the key the generator used: the seed
+// is bytes 0..31 (tools/fixtures/main.go). It is test INPUT, not library state — this
+// library holds no key material, and a Signer is how an application passes one in.
+// node:crypto signs here; nothing shipped gains a dependency.
 
 const enc = new TextEncoder()
 
-const AT_ROOT = '2026-01-02T03:04:15.123456789Z'
+const PKCS8_ED25519 = '302e020100300506032b657004220420'
+const SPKI_ED25519 = '302a300506032b6570032100'
+const PRIVATE_KEY = createPrivateKey({
+  key: Buffer.concat([Buffer.from(PKCS8_ED25519, 'hex'), Buffer.from(Uint8Array.from({ length: 32 }, (_, i) => i))]),
+  format: 'der',
+  type: 'pkcs8',
+})
+const RAW_PUBLIC = createPublicKey(PRIVATE_KEY)
+  .export({ format: 'der', type: 'spki' })
+  .subarray(Buffer.from(SPKI_ED25519, 'hex').length)
+/** The multikey framing `V-SIGN` fixes for a pubkey: 0xed as a varint, then the raw key. */
+const PUBKEY = Uint8Array.from(Buffer.concat([Buffer.from([0xed, 0x01]), RAW_PUBLIC]))
+const SIGNER = {
+  pubkey: PUBKEY,
+  sign: (message: Uint8Array): Uint8Array => Uint8Array.from(sign(null, message, PRIVATE_KEY)),
+}
+
+/** The pubkey as a contributor claim carries it: its own content (`V-SIG`). */
+const PUBKEY_CONTENT = {
+  kind: 'inline' as const,
+  bytes: PUBKEY,
+  size: PUBKEY.length,
+  encoding: 'application/octet-stream',
+}
+
+/**
+ * newClaim is the builder with the signing defaulted, since every claim is signed
+ * (`V-SIG`) and most cases here are about something else. A case about signing passes its
+ * own signer, or none where the refusal is the point.
+ *
+ * A root contributor gets the matching content too: it carries the pubkey its claims are
+ * signed under, so defaulting the signer without it would build a claim the rules refuse.
+ */
+function newClaim(input: ClaimInput): ReturnType<typeof buildClaim> {
+  if ('signer' in input) return buildClaim(input)
+  const rootContributorWithNoKey =
+    input.type === 'contribution/contributor' &&
+    input.contributor === undefined &&
+    input.content === undefined
+  return buildClaim({
+    ...input,
+    ...(rootContributorWithNoKey ? { content: PUBKEY_CONTENT } : {}),
+    signer: SIGNER,
+  })
+}
+
+// The generator's clock: one instant, each claim a second later.
+const AT_ROOT = '2026-01-02T03:04:05.123456789Z'
+const AT_SOURCE = '2026-01-02T03:04:06.123456789Z'
+const AT_ENTITY = '2026-01-02T03:04:07.123456789Z'
 const AT_NOTE = '2026-01-02T03:04:16.123456789Z'
 const AT_DERIVED = '2026-01-02T03:04:17.123456789Z'
 
-test('an identity-signed root contributor matches ranke-go', () => {
-  const built = newClaim({ type: 'contribution/contributor', createdAt: AT_ROOT })
-  assert.equal(built.id, fx.identityRoot.id)
-  assert.equal(Buffer.from(built.bytes).toString('hex'), fx.identityRoot.cbor)
+/** The root contributor as the generator builds it: its content is its own pubkey. */
+function rootContributor(): ReturnType<typeof newClaim> {
+  return newClaim({ type: 'contribution/contributor', createdAt: AT_ROOT })
+}
+
+test('a root contributor matches ranke-go', () => {
+  const built = rootContributor()
+  assert.equal(built.id, fx.contributor.id)
+  assert.equal(Buffer.from(built.bytes).toString('hex'), fx.contributor.cbor)
 })
 
-test('an identity-signed source matches ranke-go', () => {
-  const root = newClaim({ type: 'contribution/contributor', createdAt: AT_ROOT })
+test('a source matches ranke-go', () => {
+  const root = rootContributor()
   const built = newClaim({
-    type: 'source/note',
+    type: 'source/register',
     contributor: contributorFrom(root.claim),
     content: {
       kind: 'inline',
-      bytes: enc.encode('signed by nobody in particular'),
-      size: 30,
+      bytes: enc.encode('a parish register'),
+      size: 17,
       encoding: 'text/plain',
     },
-    fields: { b: 'sorts first', aa: 'sorts second' },
-    createdAt: AT_NOTE,
+    fields: {
+      title: 'Register of 1834',
+      aa: 'length-first ordering',
+      b: 'sorts before aa',
+    },
+    createdAt: AT_SOURCE,
     height: heightOf(root.claim),
+    signer: SIGNER,
   })
-  assert.equal(built.id, fx.identityNote.id)
-  assert.equal(Buffer.from(built.bytes).toString('hex'), fx.identityNote.cbor)
+  assert.equal(built.id, fx.source.id)
+  assert.equal(Buffer.from(built.bytes).toString('hex'), fx.source.cbor)
 })
 
-// Two edges, so the canonical order — by raw id bytes — is exercised rather than
-// assumed. Getting it wrong changes S(v) and so changes the id.
+// Two edges, so the order `V-EORDER` fixes — ascending by id(e), as byte strings — is
+// exercised rather than assumed. Getting it wrong changes S(v) and so changes the id.
 test('a claim with two edges matches ranke-go, edge order included', () => {
-  const root = newClaim({ type: 'contribution/contributor', createdAt: AT_ROOT })
+  const root = rootContributor()
   const contributor = contributorFrom(root.claim)
-  const note = newClaim({
-    type: 'source/note',
+  const src = newClaim({
+    type: 'source/register',
     contributor,
     content: {
       kind: 'inline',
-      bytes: enc.encode('signed by nobody in particular'),
-      size: 30,
+      bytes: enc.encode('a parish register'),
+      size: 17,
       encoding: 'text/plain',
     },
-    fields: { b: 'sorts first', aa: 'sorts second' },
-    createdAt: AT_NOTE,
+    fields: {
+      title: 'Register of 1834',
+      aa: 'length-first ordering',
+      b: 'sorts before aa',
+    },
+    createdAt: AT_SOURCE,
     height: heightOf(root.claim),
+    signer: SIGNER,
   })
 
   const built = newClaim({
-    type: 'derivation/summary',
+    type: 'entity/person',
     contributor,
-    edges: [{ reference: note.id, type: 'derivation/note' }],
-    content: {
-      kind: 'inline',
-      bytes: enc.encode('a summary of nothing'),
-      size: 20,
-      encoding: 'text/plain',
-    },
-    createdAt: AT_DERIVED,
-    height: heightOf(root.claim, note.claim),
+    edges: [{ reference: src.id, type: 'derivation/register' }],
+    fields: { name: 'Anna Weber' },
+    createdAt: AT_ENTITY,
+    height: heightOf(root.claim, src.claim),
+    signer: SIGNER,
   })
-  assert.equal(built.id, fx.identityDerived.id)
-  assert.equal(Buffer.from(built.bytes).toString('hex'), fx.identityDerived.cbor)
+  assert.equal(built.id, fx.entity.id)
+  assert.equal(Buffer.from(built.bytes).toString('hex'), fx.entity.cbor)
   // The edge order is part of S(v), so it must be ranke-go's and not insertion order.
   assert.deepEqual(
     built.claim.edges.map((e) => e.type),
-    (fx.identityDerived.edges ?? []).map((e) => e.type),
+    (fx.entity.edges ?? []).map((e) => e.type),
   )
 })
 
@@ -218,19 +283,14 @@ function equivalenceCases(): Array<{ label: string; built: ReturnType<typeof new
   ]
 }
 
-// A build encodes the node once and puts those bytes to both uses: hashing them for the
-// id, and storing them as the claim. Hashing the stored record's own preimage is what
-// holds the two uses together — bytes stored other than the bytes hashed would name a
-// claim its own record does not answer to. The signed case is left out because its id is
-// a signature over that hash rather than the hash (§5.7).
+// A build seals the envelope once and puts those bytes to both uses: hashing them for the
+// id, and storing them as the claim. Hashing the stored record is what holds the two
+// together — bytes stored other than the bytes hashed would name a claim its own record
+// does not answer to. Every case answers now, `V-ID` being a hash whatever the signer.
 test('the stored record holds the bytes the id was computed over', () => {
   for (const { label, built } of equivalenceCases()) {
-    const id = parseId(built.id)
-    if (id.algorithm() !== 'sha2-256') {
-      assert.equal(id.algorithm(), 'eddsa', `${label}: an id is a hash or a signature`)
-      continue
-    }
-    assert.equal(hashContent(nodePreimage(built.bytes)).toString(), built.id, label)
+    assert.equal(parseId(built.id).algorithm(), 'sha2-256', `${label}: an id is a hash`)
+    assert.equal(hashContent(built.bytes).toString(), built.id, label)
   }
 })
 
@@ -249,10 +309,15 @@ test('a record slot the wire would render differently is refused', () => {
     RankeBuildError,
     'an encoding class opening with the alias prefix',
   )
+  // A claim id would pass now, every id being a multihash (`V-ID`). A pubkey is the value
+  // still framed another way, so it is what shows the check is looking.
+  const pubkeyFramed = idFromBytes(
+    Uint8Array.from(Buffer.from('ed01' + '00'.repeat(32), 'hex')),
+  ).toString()
   assert.throws(
-    source({ content: { kind: 'external', hash: fx.ids.source!, size: 3, encoding: 'text/plain' } }),
+    source({ content: { kind: 'external', hash: pubkeyFramed, size: 3, encoding: 'text/plain' } }),
     RankeBuildError,
-    'a content_hash that is a signature rather than a multihash',
+    'a content_hash framed as a pubkey rather than a multihash',
   )
   assert.throws(
     source({
@@ -294,23 +359,27 @@ test('a signer produces a multikey-framed id', () => {
     },
   })
 
-  // The message signed is the 34-byte multihash of S(v), not the bare digest — which
-  // is what ranke-go signs, so a client using WebCrypto must pass these bytes through.
+  // What a signer is handed is the envelope's signing input, the `Sig_structure` of RFC
+  // 9052 §4.4 (`V-SIGN`) — not a hash. A caller signs bytes and needs no COSE of its own.
   assert.ok(signed !== null)
   const message = signed as unknown as Uint8Array
-  assert.equal(message.length, 34)
-  assert.equal(message[0], 0x12, 'the sha2-256 multicodec')
-  assert.equal(message[1], 0x20, 'the digest length')
+  assert.deepEqual(
+    Uint8Array.from(message.subarray(0, 12)),
+    Uint8Array.from(Buffer.from('846a5369676e617475726531', 'hex')),
+    'array(4), then the text "Signature1"',
+  )
 
-  // The id is the signature framed under eddsa, so it reads as a signature rather than
-  // as a hash or a public key, and carries the bytes the signer returned.
+  // The id is a plain multihash over the stored envelope (`V-ID`), and the signature the
+  // signer returned is inside those bytes rather than framing them.
   const id = parseId(built.id)
-  assert.equal(id.algorithm(), 'eddsa')
-  const raw = id.rawBytes()
-  assert.deepEqual(Uint8Array.from(raw.subarray(0, 3)), Uint8Array.from([0xed, 0xa1, 0x03]),
-    'the varint of 0xd0ed')
-  assert.equal(raw.length, 3 + 64)
-  assert.deepEqual(Uint8Array.from(raw.subarray(3)), signature)
+  assert.equal(id.algorithm(), 'sha2-256')
+  assert.equal(id.rawBytes().length, 34, 'the multicodec, the length, the digest')
+  assert.equal(hashContent(built.bytes).toString(), built.id)
+  assert.deepEqual(
+    Uint8Array.from(built.bytes.subarray(built.bytes.length - 64)),
+    signature,
+    'the envelope ends in the signature it was sealed with',
+  )
 })
 
 test('a claim declaring a key refuses to identity-sign', () => {

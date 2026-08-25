@@ -123,12 +123,9 @@ export const relation = byLabel('relation')
 /** A limiting claim, which exercises the newly aliased contribution/delete subtype. */
 export const deletion = byLabel('deletion')
 
-// Identity-signed claims: id = H(S(v)), no key involved (§5.7). These are the only
-// cases a keyless implementation can reproduce whole, id included, so they are what
-// proves a builder rather than only an encoder.
-export const identityRoot = byLabel('identity-root')
-export const identityNote = byLabel('identity-note')
-export const identityDerived = byLabel('identity-derived')
+// The identity-signed trio that stood here is gone: `Sign` is asymmetric, so a keyless
+// claim is not a claim. Every case is now reproducible instead — id(v) = H(S(env(v)))
+// needs no key to recompute, and a rebuild signs with the seed the generator used.
 
 /** cborBytes decodes a fixture's hex. */
 export function cborBytes(f: Fixture | Capped | Refusal): Uint8Array {

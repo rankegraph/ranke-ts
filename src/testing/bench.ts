@@ -20,12 +20,11 @@ import {
   type NodeRecord,
   claimFromRecord,
   decodeClaim,
-  encodeClaim,
-  encodeClaimFromNode,
   encodeEdge,
   encodeNode,
   encodeNodeWithEdges,
 } from '../codec.ts'
+import { encodeEnvelope, envelopeSigningInput, signatureLength } from '../codec_envelope.ts'
 import { hashContent, idFromBytes } from '../id.ts'
 import * as fx from './fixtures.ts'
 
@@ -104,6 +103,9 @@ const record = asRecord(built.claim)
 const edgeInputs = input.edges
 const edgeBytes = (record.edges ?? []).map(encodeEdge)
 const node = encodeNodeWithEdges(record, edgeBytes)
+// The signature the built claim carries, so the envelope stage times the assembly rather
+// than a signer's own cost, which belongs to the application.
+const signature = built.bytes.subarray(built.bytes.length - signatureLength)
 
 // asRecord is the record a decoded claim came from — the same reading codec_encode_test.ts
 // takes to re-encode a fixture. Nothing is derived: every value came off the wire.
@@ -240,12 +242,12 @@ stage('newClaim, four edges', micros(() => newClaim(input)))
 console.log('  of which')
 stage('    newEdge x4: encode, hash, parse reference', micros(() => edgeInputs.map(newEdge)))
 stage('    S(v), each edge already encoded', micros(() => encodeNodeWithEdges(record, edgeBytes)))
-stage('    H(S(v))', micros(() => hashContent(node)))
-stage('    the stored record around S(v)', micros(() => encodeClaimFromNode(node)))
+stage('    the Sig_structure the signer is handed', micros(() => envelopeSigningInput(node)))
+stage('    the envelope around S(v)', micros(() => encodeEnvelope(node, signature)))
+stage('    H(S(env(v))), the id', micros(() => hashContent(built.bytes)))
 stage('    the claim handed back', micros(() => claimFromRecord(record, built.id)))
 console.log('  and no longer on the build path')
 stage('    S(v), re-encoding every edge', micros(() => encodeNode(record)))
-stage('    the stored record, encoding the node again', micros(() => encodeClaim(record)))
 stage('    decodeClaim of the bytes just built', micros(() => decodeClaim(built.bytes, built.id)))
 console.log('Each stage is timed on its own, so the parts do not sum to the whole.\n')
 

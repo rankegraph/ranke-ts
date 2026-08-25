@@ -6,19 +6,18 @@ import {
   type EdgeRecord,
   type NodeRecord,
   decodeClaim,
-  encodeClaim,
   encodeEdge,
   encodeNode,
-  nodePreimage,
 } from './codec.ts'
+import { encodeEnvelope, envelopePayload, signatureLength } from './codec_envelope.ts'
 import { hashContent } from './id.ts'
 import * as fx from './testing/fixtures.ts'
 
 // The encoder's whole job is producing the bytes ranke-go produces: an id is computed
 // over them, so a difference of one byte is a different claim. The fixtures hold
-// ranke-go's own output, and nodePreimage extracts the exact bytes it signed over — so
-// decoding a fixture and encoding it back is a byte-for-byte comparison with the
-// reference implementation, needing no key.
+// ranke-go's own output, and envelopePayload extracts the serialized claim its signature
+// covers — so decoding a fixture and encoding it back is a byte-for-byte comparison with
+// the reference implementation, needing no key.
 
 const hex = (b: Uint8Array): string => Buffer.from(b).toString('hex')
 
@@ -50,17 +49,24 @@ function asEdgeRecord(e: Edge): EdgeRecord {
 test('encodeNode reproduces the bytes ranke-go signed over', () => {
   for (const f of fx.all) {
     const raw = fx.cborBytes(f)
-    const want = nodePreimage(raw)
+    const want = envelopePayload(raw)
     const got = encodeNode(asRecord(decodeClaim(raw, f.id)))
     assert.equal(hex(got), hex(want), f.label)
   }
 })
 
-test('encodeClaim reproduces the whole stored record', () => {
+// The stored record is the envelope, and its signature is data the fixture carries — so
+// re-sealing with that signature reproduces the record and its id without a key. A wrong
+// payload would change the envelope and so the id, which is what makes this a byte check
+// on everything the builder assembles, not just on the signature being copied through.
+test('re-sealing reproduces the whole stored record and its id', () => {
   for (const f of fx.all) {
     const raw = fx.cborBytes(f)
-    const got = encodeClaim(asRecord(decodeClaim(raw, f.id)))
+    const signature = raw.subarray(raw.length - signatureLength)
+    const payload = encodeNode(asRecord(decodeClaim(raw, f.id)))
+    const got = encodeEnvelope(payload, signature)
     assert.equal(hex(got), hex(raw), f.label)
+    assert.equal(hashContent(got).toString(), f.id, `${f.label}: id(v) = H(S(env(v)))`)
   }
 })
 
@@ -84,7 +90,11 @@ test('encodeEdge reproduces every edge id ranke-go computed', () => {
 test('the richest claim round-trips through the encoder', () => {
   const raw = fx.cborBytes(fx.relation)
   const c = decodeClaim(raw, fx.relation.id)
-  const again = decodeClaim(encodeClaim(asRecord(c)), fx.relation.id)
+  const resealed = encodeEnvelope(
+    encodeNode(asRecord(c)),
+    raw.subarray(raw.length - signatureLength),
+  )
+  const again = decodeClaim(resealed, fx.relation.id)
   assert.deepEqual(again, c)
 })
 
@@ -123,7 +133,7 @@ test('an omitted field set encodes as an absent slot, not an empty map', () => {
 test('field keys keep the canonical order under re-encoding', () => {
   const raw = fx.cborBytes(fx.source)
   const c = decodeClaim(raw, fx.source.id)
-  assert.equal(hex(encodeNode(asRecord(c))), hex(nodePreimage(raw)))
+  assert.equal(hex(encodeNode(asRecord(c))), hex(envelopePayload(raw)))
 
   // The same fields offered in a different insertion order must encode identically:
   // the ordering is the encoder's, never the caller's.
@@ -131,5 +141,5 @@ test('field keys keep the canonical order under re-encoding', () => {
     ...asRecord(c),
     fields: { title: c.fields.title!, b: c.fields.b!, aa: c.fields.aa! },
   })
-  assert.equal(hex(shuffled), hex(nodePreimage(raw)))
+  assert.equal(hex(shuffled), hex(envelopePayload(raw)))
 })

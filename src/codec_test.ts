@@ -3,7 +3,8 @@ import test from 'node:test'
 
 import type { Claim } from './claim.ts'
 import { contributorOf, edgesOfType, getField, hasField } from './claim.ts'
-import { RankeDecodeError, decodeClaim, nodePreimage } from './codec.ts'
+import { RankeDecodeError, decodeClaim } from './codec.ts'
+import { envelopePayload } from './codec_envelope.ts'
 import { decodeClaimJSON, type WireClaim } from './codec_json.ts'
 import { hashContent } from './id.ts'
 import * as fx from './testing/fixtures.ts'
@@ -181,17 +182,18 @@ test('the contributor edge names the signer', () => {
   )
 })
 
-// A claim's record does not carry its own id, so a decode is told it. Verification
-// hashes the stored preimage, never a re-encode.
-test('nodePreimage extracts the bytes an id was signed over', () => {
+// A claim's record does not carry its own id, so a decode is told it. `V-ID` hashes the
+// stored bytes — the envelope, not the payload inside it — so the check needs no key.
+test('the id is H over the stored bytes, and the payload sits inside them', () => {
   const raw = fx.cborBytes(fx.source)
-  const pre = nodePreimage(raw)
-  assert.ok(pre.length > 0)
-  assert.ok(raw.length > pre.length, 'the preimage is the node record inside the claim')
-  // Stable, and a hash of it is well-formed — checking the signature needs Ed25519,
-  // which this library declines to hold.
-  assert.equal(hashContent(pre).algorithm(), 'sha2-256')
-  assert.deepEqual(nodePreimage(raw), pre)
+  assert.equal(hashContent(raw).toString(), fx.source.id, 'id(v) = H(S(env(v)))')
+
+  const payload = envelopePayload(raw)
+  assert.ok(payload.length > 0)
+  assert.ok(raw.length > payload.length, 'the payload is the record inside the envelope')
+  // Hashing the payload answers something, and it is not the id: that is what `R-QCANON`
+  // means by `detail: claims` carrying no such guarantee.
+  assert.notEqual(hashContent(payload).toString(), fx.source.id)
 })
 
 test('an omitted id leaves the claim unnamed', () => {

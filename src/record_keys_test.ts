@@ -7,7 +7,7 @@ import {
   type RecordKind,
   recordKeyName,
 } from './record_keys.ts'
-import { nodePreimage } from './codec.ts'
+import { envelopePayload } from './codec_envelope.ts'
 import { CborReader } from './internal/cbor.ts'
 import * as fx from './testing/fixtures.ts'
 
@@ -99,7 +99,7 @@ function jsonKeyFor(name: string): string {
 test('every name is one ranke-go projects the same slot under', () => {
   let checked = 0
   for (const f of fx.all) {
-    const record = nodePreimage(fx.cborBytes(f))
+    const record = envelopePayload(fx.cborBytes(f))
     const projected = f.json as Record<string, unknown>
     for (const key of keysOf(record)) {
       const name = NodeRecordKeys.get(key)
