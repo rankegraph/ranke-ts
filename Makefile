@@ -4,7 +4,8 @@
 
 .PHONY: all install test typecheck build clean verify check release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
-	spec ranke-go-check rule-citations major minor patch breaking feature fix
+	spec ranke-go-check rule-citations next-version next-version-check \
+	major minor patch breaking feature fix
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -114,7 +115,7 @@ ranke-go-check:
 # check-generated is here because it was documented as a release gate and run by
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
-verify: spec ranke-go-check typecheck test build check-generated rule-citations
+verify: spec ranke-go-check next-version-check typecheck test build check-generated rule-citations
 
 # The conventional name for the gate above — an alias, so both spellings run the
 # same checks and neither can drift from the other.
@@ -130,16 +131,30 @@ version:
 		exit 1; \
 	}
 
+# The version the next release takes: ranke-go's, or the first free patch above it. The
+# major and minor are always ranke-go's, so the two read side by side.
+next-version:
+	@./scripts/next-version.sh
+
+# The rule above, over its worked examples and the invariant they instance. In `verify`
+# because release machinery that computes the wrong version mints a wrong release, and
+# nothing downstream would question the number it was handed.
+next-version-check:
+	@./scripts/next-version-test.sh
+
 # Cut a release: verify → rebase onto the default branch → merge via PR → tag the
 # merged tip → push the tag → watch the release workflow, failing here if it fails.
 # Run it from a feature branch; from the default branch it refuses, since the tag
 # must land on code a PR merged and CI checked.
-# Usage: make release <major|minor|patch> (aliases: breaking|feature|fix).
+#
+# Usage: make release. There is no bump word to pass — the version follows the ranke-go
+# this tree mirrors, so nothing about it is a judgement to make at release time.
 release: verify
 	@./scripts/release.sh $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
 
-# Absorb the positional bump word in `make release <bump>` so it isn't treated
-# as a missing target.
+# Absorb a bump word so `make release patch` reaches release.sh, which refuses it by name
+# rather than leaving make to report a missing target. Someone passing one believes they
+# chose something, and should be told they did not.
 major minor patch breaking feature fix:
 	@:
 
