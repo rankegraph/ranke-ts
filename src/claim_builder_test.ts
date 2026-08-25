@@ -351,6 +351,73 @@ test('a signer whose key the claim does not declare is refused', () => {
   )
 })
 
+// --- idempotency ---
+
+// §Idempotency: identical claims produce identical ids, so writes are idempotent and
+// deduplication is free. That holds only while a build draws on nothing but its input —
+// no clock, no counter, and no randomness in whatever seals the claim. The property is
+// load-bearing rather than incidental: an id is what a reference names, so a build that
+// varied would mint a second name for one claim and break every reference to the first.
+test('building the same claim twice yields the same bytes and id', () => {
+  const contributor = root()
+  const input = {
+    type: 'source/note',
+    contributor,
+    createdAt: AT_NOTE,
+    height: 1,
+    fields: { title: 'a register', b: 'sorts before aa' },
+    content: {
+      kind: 'inline' as const,
+      bytes: enc.encode('a parish register'),
+      size: 17,
+      encoding: 'text/plain',
+    },
+  }
+  const first = newClaim(input)
+  const second = newClaim(input)
+  assert.equal(second.id, first.id, 'the id')
+  assert.deepEqual(second.bytes, first.bytes, 'the stored bytes')
+})
+
+// The same over a claim carrying edges, where an ordering that depended on anything but
+// the edges themselves would show: they are sorted by id, so two builds must agree on
+// both the order and every id in it.
+test('an edge-bearing claim is built identically twice', () => {
+  const contributor = root()
+  const target = newClaim({ type: 'source/note', contributor, createdAt: AT_ROOT, height: 1 })
+  const input = {
+    type: 'derivation/summary',
+    contributor,
+    createdAt: AT_DERIVED,
+    height: 2,
+    edges: [
+      { reference: target.id, type: 'derivation/note', fields: { name: 'source' } },
+      { reference: target.id, type: 'derivation/scan', fields: { name: 'scan' } },
+    ],
+  }
+  const first = newClaim(input)
+  const second = newClaim(input)
+  assert.equal(second.id, first.id, 'the id')
+  assert.deepEqual(second.bytes, first.bytes, 'the stored bytes')
+  assert.deepEqual(
+    second.claim.edges.map((e) => e.reference),
+    first.claim.edges.map((e) => e.reference),
+    'the edge order',
+  )
+})
+
+// The bound on the two above: a build that ignored its input would pass them both. One
+// field apart is one claim apart, and the ids must differ.
+test('a claim differing in one field gets a different id', () => {
+  const contributor = root()
+  const base = { type: 'source/note', contributor, createdAt: AT_NOTE, height: 1 }
+  const plain = newClaim(base)
+  const titled = newClaim({ ...base, fields: { title: 'a register' } })
+  const later = newClaim({ ...base, createdAt: AT_DERIVED })
+  assert.notEqual(titled.id, plain.id, 'a field changes the id')
+  assert.notEqual(later.id, plain.id, 'a timestamp changes the id')
+})
+
 // --- the rules ---
 
 function root() {
