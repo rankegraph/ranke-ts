@@ -53,8 +53,10 @@ type edgeRef struct {
 }
 
 type fixture struct {
-	Label string    `json:"label"`
-	ID    string    `json:"id"`
+	Label string `json:"label"`
+	ID    string `json:"id"`
+	// CBOR is Envelope(): the stored record, whose hash is the id (`V-ENV`, `V-ID`).
+	// EncodeCBOR would give the payload inside it, which no id checks (`R-QCANON`).
 	CBOR  string    `json:"cbor"`
 	JSON  any       `json:"json"`
 	Edges []edgeRef `json:"edges"`
@@ -63,14 +65,18 @@ type fixture struct {
 // capped is one claim served under an output.content option (`R-QCONTENT`), so a client
 // has reference bytes for a read that inlines part of a claim's content, or none of it.
 // Cap is the max asked for, -1 standing for an absent content section.
+//
+// A served record is a serialized claim, not an envelope (`R-QDETAIL`), and ranke-go
+// exports no decoder for one — DecodeClaim reads the envelope around it. So what the
+// record HOLDS is not read back here. It does not need to be: the same record is emitted
+// in both encodings, so the two readings check each other, and Size is what the declared
+// length must equal in either.
 type capped struct {
 	Label    string `json:"label"`
 	ID       string `json:"id"`
 	Cap      int    `json:"cap"`
 	Overflow string `json:"overflow"`
-	Size     int    `json:"size"`     // the content's true length, taken from the claim built
-	Declared int    `json:"declared"` // content_size read back OFF the served record
-	Inline   int    `json:"inline"`   // the bytes the served record actually carries
+	Size     int    `json:"size"` // the content's true length, taken from the claim built
 	CBOR     string `json:"cbor"`
 	JSON     any    `json:"json"`
 }
@@ -89,7 +95,7 @@ type refusal struct {
 // refuse encodes c and records what DecodeClaim makes of the bytes. It panics where the
 // decode ACCEPTS them, since a refusal case that decodes cleanly asserts nothing.
 func refuse(label string, c ranke.Claim) refusal {
-	raw, err := c.EncodeCBOR(ranke.FormOriginal)
+	raw, err := c.Envelope()
 	must(err)
 	if _, err = ranke.DecodeClaim(c.ID(), raw); err == nil {
 		panic("refusal case " + label + " decodes cleanly")
@@ -189,37 +195,11 @@ func main() {
 		Sign()
 	must(err)
 
-	// Identity-signed claims, where id = H(S(v)) and no key is involved (§5.7). These
-	// are the cases a keyless implementation can reproduce whole, id included, so they
-	// are what proves a builder rather than only an encoder.
-	idRoot, err := ranke.NewClaim(ranke.NodeContributor, nil).
-		WithCreatedAt(at.Add(10 * time.Second)).
-		Sign()
-	must(err)
-	idContributor, err := idRoot.AsContributor(context.Background(), nil)
-	must(err)
-
-	idNote, err := ranke.NewClaim(ranke.TypeSource("note"), idContributor).
-		WithInlineContent([]byte("signed by nobody in particular")).
-		WithEncoding(ranke.EncodingPlain).
-		WithField("b", "sorts first").
-		WithField("aa", "sorts second").
-		WithCreatedAt(at.Add(11 * time.Second)).
-		WithHeight(ranke.HeightOf(idContributor)).
-		Sign()
-	must(err)
-
-	// Two edges, so the canonical edge order is exercised rather than assumed.
-	idProv, err := ranke.NewEdge(ranke.EdgeConfig{Reference: idNote.ID(), Type: ranke.TypeDerivation("note")})
-	must(err)
-	idDerived, err := ranke.NewClaim(ranke.TypeDerivation("summary"), idContributor).
-		WithEdges(idProv).
-		WithInlineContent([]byte("a summary of nothing")).
-		WithEncoding(ranke.EncodingPlain).
-		WithCreatedAt(at.Add(12 * time.Second)).
-		WithHeight(ranke.HeightOf(idContributor, idNote)).
-		Sign()
-	must(err)
+	// The identity-signed trio that stood here is gone. `Sign` is asymmetric (§Primitives)
+	// and every contributor carries a pubkey, so a keyless claim is not a claim — and the
+	// property those three carried, an id a keyless implementation can reproduce, now
+	// belongs to every case: id(v) = H(S(env(v))) needs no key to recompute, and each
+	// fixture records its signature so a builder can be held to the bytes as well.
 
 	// Records `V-TIME` refuses, built through the public API: the builder ranges no
 	// timestamp field, so a claim carrying an unreadable one encodes, and the decode is
@@ -229,26 +209,26 @@ func main() {
 	for _, name := range []string{
 		ranke.FieldDeleteBy, ranke.FieldPubkeyValidFrom, ranke.FieldPubkeyExpiresAfter,
 	} {
-		bad, err := ranke.NewClaim(ranke.TypeSource("note"), idContributor).
+		bad, err := ranke.NewClaim(ranke.TypeSource("note"), alice).
 			WithField(name, badTime).
 			WithCreatedAt(at.Add(20 * time.Second)).
-			WithHeight(ranke.HeightOf(idContributor)).
-			Sign()
+			WithHeight(ranke.HeightOf(alice)).
+			Sign(priv)
 		must(err)
 		refusals = append(refusals, refuse("a node's "+name+" will not parse", bad))
 	}
 	// The same on an edge, which is where `R-DPLANNED` keeps a copied delete_by.
 	badEdge, err := ranke.NewEdge(ranke.EdgeConfig{
-		Reference: idNote.ID(),
+		Reference: src.ID(),
 		Type:      ranke.TypeDerivation("note"),
 		Fields:    map[string]string{ranke.FieldDeleteBy: badTime},
 	})
 	must(err)
-	badEdgeClaim, err := ranke.NewClaim(ranke.TypeDerivation("summary"), idContributor).
+	badEdgeClaim, err := ranke.NewClaim(ranke.TypeDerivation("summary"), alice).
 		WithEdges(badEdge).
 		WithCreatedAt(at.Add(21 * time.Second)).
-		WithHeight(ranke.HeightOf(idContributor, idNote)).
-		Sign()
+		WithHeight(ranke.HeightOf(alice, src)).
+		Sign(priv)
 	must(err)
 	refusals = append(refusals, refuse("an edge's delete_by will not parse", badEdgeClaim))
 
@@ -270,11 +250,8 @@ func main() {
 			"source":          src.ID().String(),
 			"entity":          person.ID().String(),
 			"relation":        family.ID().String(),
-			"deletion":        deletion.ID().String(),
-			"scanHash":        scanHash.String(),
-			"identityRoot":    idRoot.ID().String(),
-			"identityNote":    idNote.ID().String(),
-			"identityDerived": idDerived.ID().String(),
+			"deletion": deletion.ID().String(),
+			"scanHash": scanHash.String(),
 		},
 		Refusals: refusals,
 	}
@@ -288,11 +265,8 @@ func main() {
 		{"entity", person},
 		{"relation", family},
 		{"deletion", deletion},
-		{"identity-root", idRoot},
-		{"identity-note", idNote},
-		{"identity-derived", idDerived},
 	} {
-		cborBytes, err := c.claim.EncodeCBOR(ranke.FormOriginal)
+		cborBytes, err := c.claim.Envelope()
 		must(err)
 		jsonBytes, err := c.claim.EncodeJSON(ranke.FormOriginal)
 		must(err)
@@ -326,16 +300,9 @@ func main() {
 		var projected any
 		must(json.Unmarshal(jsonBytes, &projected))
 
-		served, err := ranke.DecodeClaim(nil, cborBytes)
-		must(err)
-		inline, err := served.Node().GetInlineContent()
-		must(err)
-
-		// Declared comes off the served record rather than the claim, so a fixture that
-		// wrote a truncated content_size would show up here instead of passing silently.
 		f := capped{
 			Label: cc.label, ID: src.ID().String(), Cap: -1,
-			Size: len(srcInline), Declared: int(served.Node().GetContentSize()), Inline: len(inline),
+			Size: len(srcInline),
 			CBOR: hex.EncodeToString(cborBytes), JSON: projected,
 		}
 		if cc.oc != nil {

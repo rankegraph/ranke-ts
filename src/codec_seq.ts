@@ -12,7 +12,12 @@
 // caller switches once, as ranke-go's QueryResult has it.
 
 import type { Claim } from './claim.ts'
-import { RankeDecodeError, decodeClaim, type DecodeOptions } from './codec.ts'
+import {
+  RankeDecodeError,
+  decodeClaim,
+  decodeSerializedClaim,
+  type DecodeOptions,
+} from './codec.ts'
 import { decodeClaimJSON, type WireClaim } from './codec_json.ts'
 import { CborReader } from './internal/cbor.ts'
 
@@ -52,6 +57,11 @@ export interface QueryEvent {
  */
 export type ResultRecord =
   | { readonly kind: 'claim'; readonly claim: Claim }
+  /**
+   * The stored record under `detail: envelope`, with the bytes kept: hashing them against
+   * the id is the only check a client can make itself (`R-QCANON`).
+   */
+  | { readonly kind: 'envelope'; readonly bytes: Uint8Array; readonly claim: Claim }
   | { readonly kind: 'claim_id'; readonly id: string }
   | { readonly kind: 'path_id'; readonly ids: readonly string[] }
   | { readonly kind: 'report'; readonly report: QueryReport }
@@ -97,7 +107,9 @@ export function newSeqReader(encoding: SeqEncoding, opts: DecodeOptions = {}): S
     const out: Claim[] = []
     for (const rec of records) {
       const decoded = decodeResultRecord(rec, encoding, opts)
-      if (decoded.kind === 'claim') out.push(decoded.claim)
+      // Both details that carry a claim: the serialized record, and the envelope around
+      // one. A caller wanting the bytes as well reaches for readRecords.
+      if (decoded.kind === 'claim' || decoded.kind === 'envelope') out.push(decoded.claim)
       else if (decoded.kind !== 'report') throw notAClaim(decoded.kind)
     }
     return out
@@ -158,6 +170,7 @@ export function decodeResultRecord(
 const MAJOR_TEXT = 3
 const MAJOR_ARRAY = 4
 const MAJOR_MAP = 5
+const MAJOR_TAG = 6
 const MAJOR_SIMPLE = 7
 
 function decodeCborRecord(raw: Uint8Array, opts: DecodeOptions): ResultRecord {
@@ -183,8 +196,15 @@ function decodeCborRecord(raw: Uint8Array, opts: DecodeOptions): ResultRecord {
       r.readMapHeader()
       const keyMajor = raw[r.position]! >> 5
       if (keyMajor === MAJOR_TEXT) return { kind: 'report', report: readCborReport(raw) }
-      return { kind: 'claim', claim: decodeClaim(raw, '', opts) }
+      // `detail: claims` serves the serialized claim, the envelope's payload — so no id
+      // covers it, and it decodes as a payload rather than through an envelope.
+      return { kind: 'claim', claim: decodeSerializedClaim(raw, '', opts) }
     }
+    // `detail: envelope` serves the stored record, tagged apart from a serialized claim so
+    // a reader parses one and hands on the other (`R-QSTREAM`). The bytes ride along
+    // because hashing them against an id is the whole reason to ask for this form.
+    case MAJOR_TAG:
+      return { kind: 'envelope', bytes: raw, claim: decodeClaim(raw, '', opts) }
     default:
       throw new RankeDecodeError(
         `a result record is a text string, a list or a map, got CBOR major type ${raw[0]! >> 5}`,
@@ -287,7 +307,7 @@ export async function* readClaims(
   opts: DecodeOptions = {},
 ): AsyncGenerator<Claim, void, undefined> {
   for await (const rec of readRecords(stream, encoding, opts)) {
-    if (rec.kind === 'claim') yield rec.claim
+    if (rec.kind === 'claim' || rec.kind === 'envelope') yield rec.claim
     else if (rec.kind !== 'report') throw notAClaim(rec.kind)
   }
 }

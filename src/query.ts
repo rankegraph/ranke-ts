@@ -135,9 +135,9 @@ export interface Output {
    */
   shape?: "single" | "path";
   /**
-   * What each element carries: id (the id alone) or claims (the claim in full). Under shape: path it applies to every claim in the route (R-QDETAIL).
+   * What each element carries: id (the id alone), claims (a record the engine assembles, shaped by form and content), or envelope (the stored bytes copied out whole, the only output a client can hash against an id; form and content do not apply, and both form: materialized and encoding: json are rejected with it). Under shape: path it applies to every claim in the route (R-QDETAIL, R-QCANON).
    */
-  detail?: "id" | "claims";
+  detail?: "id" | "claims" | "envelope";
   /**
    * Which field values a claim carries: original as written, a diff-overlaid claim's delta; materialized with any contribution/diff chain resolved over the predecessor it references, recursively to a base claim. A property of the values, hence orthogonal to detail and encoding (R-QFORM).
    */

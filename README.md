@@ -38,7 +38,14 @@ same bytes ranke-go produces, which the tests assert byte for byte.
 ```ts
 import { contributorFrom, heightOf, newClaim } from '@flocko-motion/ranke'
 
-const root = newClaim({ type: 'contribution/contributor', createdAt: at })
+// A contributor carries the pubkey its claims are signed under, and every claim is
+// signed — so a signer goes with every build.
+const root = newClaim({
+  type: 'contribution/contributor',
+  content: { kind: 'inline', bytes: pubkey, size: pubkey.length, encoding: 'application/octet-stream' },
+  createdAt: at,
+  signer,
+})
 const alice = contributorFrom(root.claim)
 
 const note = newClaim({
@@ -48,17 +55,18 @@ const note = newClaim({
   fields: { title: 'a note' },
   height: heightOf(root.claim),
   createdAt: at,
+  signer,
 })
 
-note.id      // "bciq…" — H(S(v)), since nothing signed it
-note.bytes   // exactly what the id commits to
+note.id      // "bciq…" — H(S(env(v))), the hash of the stored record
+note.bytes   // the envelope: exactly what the id commits to
 note.claim   // the same claim a decode of those bytes yields
 ```
 
-Two claims above are **identity-signed**: with no key involved the id is the hash
-itself, which §5.7 admits wherever the contributor publishes none. That is what a
-mock graph wants, and it is also the only case a keyless library can reproduce
-whole — which is how the builder is tested against ranke-go.
+The id is a hash of the bytes, so **anyone can recompute it without a key** — which
+is what `V-ID` separates from `V-SIG`, where a signature once had to be checked to
+know an id at all. It is also how the builder is tested against ranke-go: every
+fixture is reproducible, not merely the keyless ones there used to be.
 
 **A key stays with the application.** Pass a `signer` and the library never sees
 it:
@@ -68,19 +76,20 @@ const signed = newClaim({
   type: 'contribution/contributor',
   content: { kind: 'inline', bytes: pubkey, size: pubkey.length, encoding: 'application/octet-stream' },
   createdAt: at,
-  signer: { pubkey, sign: (message) => /* Ed25519 over these 34 bytes */ },
+  signer: { pubkey, sign: (message) => /* Ed25519 over these bytes, raw */ },
 })
 ```
 
-The message handed to `sign` is the 34-byte SHA2-256 **multihash** of S(v), not
-the bare digest — that is what ranke-go signs, so a WebCrypto caller must pass
-those bytes through unchanged.
+The message handed to `sign` is the envelope's signing input — the `Sig_structure` of
+RFC 9052 §4.4 over S(v) (`V-SIGN`). The library builds it, so a WebCrypto caller signs
+the bytes it is handed and needs no COSE of its own. Return the 64 raw bytes: the
+scheme is named in the envelope's header, so the signature carries no framing.
 
 The builder enforces what construction can: the type vocabularies, the
 inline-or-addressed content rule with its mandatory encoding, one contributor edge
 and one diff edge, named edges on a diff claim, the canonical edge order,
-R-DPLANNED on an edge whose target is scheduled, and that a claim declaring a key
-cannot identity-sign.
+R-DPLANNED on an edge whose target is scheduled, and that the signer's key is the one
+the claim declares. A build with no signer is refused, every claim being signed.
 
 It does not require a derivation, entity or relation claim to carry a
 `derivation/*` edge. A retired rule said so; the spec's ADT rules are the
@@ -193,8 +202,9 @@ into "this claim has nothing", which is the same answer to two different questio
 
 ## Record keys
 
-A claim serializes as a CBOR map under the numeric keys `V-SER` fixes, and a tool
-rendering those bytes needs them by name. `record_keys.ts` exports the table:
+Inside its envelope, a claim serializes as a CBOR map under the numeric keys `V-SER`
+fixes, and a tool rendering those bytes needs them by name. `record_keys.ts` exports
+the table:
 
 ```ts
 import { NodeRecordKeys, EdgeRecordKeys, recordKeyName } from '@flocko-motion/ranke'
@@ -213,6 +223,10 @@ number has no name, so a reader shows it as the number rather than guessing.
 The codec reads these same constants, which is what makes the exported table the
 one a decode uses. Never transcribe it: a second copy of the numbering is free to
 drift from the encoder, and an id is computed over the encoded bytes.
+
+The table itself is unchanged by the envelope; what went is the key a claim used to be
+wrapped under, the payload now being the record. `envelopePayload` unwraps a stored
+claim to the bytes these keys index.
 
 ## Inspecting broken bytes
 
@@ -292,15 +306,18 @@ Each records the ranke-go release it came from, and the suite refuses a set that
 names no release. A hand-copied fixture is one nibble from testing the wrong
 thing, which is how this rule was learnt.
 
-**Conformance runs against the published set.** ranke-graph releases
-`ranke-testdata.tar.gz`, whose manifest names 14 claim cases and 2 content blobs
-and what each must do. The suite fetches it and holds this library to it, so
-conformance is measured against the spec's artifact rather than against agreement
-with a sibling. Thirteen of the sixteen are decidable without a key: every valid
-decode, a malformed id, a height that does not follow, a reference that resolves
-nowhere, an identity Sign whose signer publishes a key, and both blobs against
-the hash they are filed under. The three that turn on a signature are named
-individually in the test, so a case becoming undecidable for a new reason fails
+**Conformance runs against ranke-graph's reference claims.** Their manifest names each
+case and what it must do, so conformance is measured against the spec's artifact rather
+than against agreement with a sibling. They come from the clone `make spec` takes,
+beside the spec itself: the rules and the claims exercising them are then always from
+one moment, where a released bundle would lag the spec and let a change that ought to
+break this library pass unremarked.
+
+Most cases are decidable with no key at all, `V-ID` being a hash over the stored bytes —
+every valid decode, a malformed id, a height that does not follow, a reference that
+resolves nowhere, a claim stored without its envelope, edges stored out of order, and
+each content blob against the hash it is filed under. Those that turn on a signature are
+named individually in the test, so a case becoming undecidable for a new reason fails
 rather than passes quietly. Set `RANKE_TESTDATA_DIR` to work offline.
 
 ## Development
@@ -317,11 +334,11 @@ make docs       # fetch the papers and the spec, for reading
 make verify     # the gate a release must pass
 ```
 
-`verify` takes the latest spec and the latest published vectors before it checks
-anything. Both otherwise sit behind gitignored caches that never expire, so a run would
-report on whatever was fetched once, however long ago. A spec that moved while this code
-did not means the code is broken, and that is the finding rather than a false alarm — so
-the gate needs the network, and offline you name local copies instead:
+`verify` takes the latest spec before it checks anything, and the reference claims ride
+in the same clone. Otherwise the papers sit behind a gitignored copy that never expires,
+so a run would report on whatever was fetched once, however long ago. A spec that moved
+while this code did not means the code is broken, and that is the finding rather than a
+false alarm — so the gate needs the network, and offline you name local copies instead:
 
 ```sh
 make verify RANKE_SPEC=path/to/spec.typ RANKE_TESTDATA_DIR=path/to/vectors

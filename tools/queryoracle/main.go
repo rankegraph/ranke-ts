@@ -53,6 +53,7 @@ var sentinels = []struct {
 	{"ErrQueryHops", ranke.ErrQueryHops},
 	{"ErrQueryOrderField", ranke.ErrQueryOrderField},
 	{"ErrQueryLayerName", ranke.ErrQueryLayerName},
+	{"ErrQueryEnvelopeAxis", ranke.ErrQueryEnvelopeAxis},
 	{"ErrQueryBounds", ranke.ErrQueryBounds},
 	{"ErrQueryEncoding", ranke.ErrQueryEncoding},
 	{"ErrQueryEnum", ranke.ErrQueryEnum},
@@ -128,6 +129,10 @@ func main() {
 		{"a fractional duration", `{"select":{"branch":"main"},"limit":{"time":"1.5s"}}`},
 		{"results 0 means unbounded", `{"select":{"branch":"main"},"limit":{"results":0}}`},
 		{"a scan may ask for shape single", `{"select":{"branch":"main"},"output":{"shape":"single"}}`},
+		{
+			"an envelope read, the only output a client can hash against an id",
+			`{"select":{"branch":"main"},"output":{"detail":"envelope","encoding":"cbor"}}`,
+		},
 		// A path-less claim anchors the frontier the closure is taken from (`R-QANCHOR`),
 		// so it is a read of what one claim reaches rather than a traversal with no start.
 		{
@@ -173,6 +178,16 @@ func main() {
 		{"a sort key with an empty field", `{"select":{"branch":"main"},"order":[{"field":""}]}`},
 		{"an empty execution layer", `{"select":{"branch":"main"},"execution":{"layer":""}}`},
 		{"a whitespace execution layer", `{"select":{"branch":"main"},"execution":{"layer":"  "}}`},
+		// `detail: envelope` returns the stored bytes copied, so neither axis that would
+		// rebuild them applies (`R-QCANON`).
+		{
+			"an envelope read asking to materialize",
+			`{"select":{"branch":"main"},"output":{"detail":"envelope","form":"materialized"}}`,
+		},
+		{
+			"an envelope read asking for json",
+			`{"select":{"branch":"main"},"output":{"detail":"envelope","encoding":"json"}}`,
+		},
 		{"an unknown sort direction", `{"select":{"branch":"main"},"order":[{"field":"a","dir":"up"}]}`},
 		{"a report level only a Go caller may set", `{"select":{"branch":"main"},"execution":{"report":"warn"}}`},
 		{"an unknown report level", `{"select":{"branch":"main"},"execution":{"report":"everything"}}`},

@@ -23,7 +23,6 @@ import {
   nodeSubtypeToAlias,
 } from './node_taxonomy.ts'
 import {
-  ClaimFileKeyNode,
   EdgeKeyReference,
   EdgeKeyRelationDirection,
   NodeKeyCreatedAt,
@@ -38,6 +37,7 @@ import {
   RecordKeyTypeClass,
   RecordKeyTypeSubtype,
 } from './record_keys.ts'
+import { envelopePayload } from './codec_envelope.ts'
 import { checkTimestampFields, validRFC3339Nano } from './time_fields.ts'
 import {
   CborReader,
@@ -73,12 +73,7 @@ export interface DecodeOptions {
  */
 export function decodeClaim(bytes: Uint8Array, id = '', opts: DecodeOptions = {}): Claim {
   try {
-    const r = new CborReader(bytes)
-    const entries = readIntMap(r)
-    r.expectEnd()
-    const nodeRaw = entries.get(ClaimFileKeyNode)
-    if (nodeRaw === undefined) throw new RankeDecodeError('the claim carries no node record')
-    return decodeNode(nodeRaw, id, opts)
+    return decodeSerializedClaim(envelopePayload(bytes), id, opts)
   } catch (err) {
     if (err instanceof RankeDecodeError) throw err
     throw new RankeDecodeError(`not a claim: ${(err as Error).message}`)
@@ -86,16 +81,16 @@ export function decodeClaim(bytes: Uint8Array, id = '', opts: DecodeOptions = {}
 }
 
 /**
- * nodePreimage extracts S(node) — key 1 — from a claim's stored bytes, the exact bytes
- * an id was signed over. Checking an id against them is `V-ID`, which is why it hashes
- * these and never a re-encode.
+ * decodeSerializedClaim decodes S(v) — an envelope's payload, and what a read returns under
+ * `detail: claims`. A payload on its own is not a claim: the id covers the envelope around
+ * it, so nothing decoded this way can be checked against one (`R-QCANON`).
  */
-export function nodePreimage(bytes: Uint8Array): Uint8Array {
-  const r = new CborReader(bytes)
-  const entries = readIntMap(r)
-  const node = entries.get(ClaimFileKeyNode)
-  if (node === undefined) throw new RankeDecodeError('the claim carries no node record')
-  return node
+export function decodeSerializedClaim(
+  payload: Uint8Array,
+  id = '',
+  opts: DecodeOptions = {},
+): Claim {
+  return decodeNode(payload, id, opts)
 }
 
 // readIntMap reads a map with integer keys, returning each value's raw bytes. Raw,
@@ -499,23 +494,6 @@ export function encodeNodeWithEdges(n: NodeRecord, edges: readonly Uint8Array[])
 
   const w = new CborWriter()
   w.writeSortedMap(entries)
-  return w.bytes()
-}
-
-/** encodeClaim wraps a node record as the stored claim: the record under key 1. */
-export function encodeClaim(n: NodeRecord): Uint8Array {
-  return encodeClaimFromNode(encodeNode(n))
-}
-
-/**
- * encodeClaimFromNode is encodeClaim over S(v) already in hand — the very bytes the id
- * was computed over, so the stored record and the id cannot come apart.
- *
- * @internal
- */
-export function encodeClaimFromNode(node: Uint8Array): Uint8Array {
-  const w = new CborWriter()
-  w.writeSortedMap([[encodeUint(ClaimFileKeyNode), node]])
   return w.bytes()
 }
 

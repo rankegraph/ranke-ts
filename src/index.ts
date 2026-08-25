@@ -7,6 +7,7 @@
 export * from './claim.ts'
 export * from './claim_builder.ts'
 export * from './codec.ts'
+export * from './codec_envelope.ts'
 export * from './codec_json.ts'
 export * from './codec_seq.ts'
 export * from './content.ts'

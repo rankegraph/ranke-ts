@@ -10,11 +10,8 @@ import { sha256 } from './internal/sha256.ts'
 const CODE_SHA2_256 = 0x12
 /** Multicodec code for an Ed25519 public key. */
 const CODE_ED25519_PUB = 0xed
-/**
- * Multicodec code for an EdDSA signature, which is what frames a node id (`V-SIGN`). A
- * pubkey carries CODE_ED25519_PUB, so the code alone says which of the two a payload is.
- */
-const CODE_EDDSA = 0xd0ed
+// No code for a signature: `V-SIGN` frames one no longer, the envelope's protected header
+// naming the scheme instead, and a signature is never an id.
 
 const SHA2_256_LEN = 32
 
@@ -23,11 +20,13 @@ const MULTIBASE_BASE32 = 'b'
 const B32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567'
 
 /**
- * Id is a self-describing, content-addressed identifier: id(v) = Sign(H(S(v)))
- * for nodes, id(e) = H(S(e)) for edges (spec §4).
+ * Id is a content-addressed identifier, and always a multihash (`V-HASH`):
+ * id(v) = H(S(env(v))) for a claim (`V-ID`), id(e) = H(S(e)) for an edge, and H(c) for
+ * external content.
  *
- * A node id is therefore a signature and an edge id a hash, and the leading
- * varint says which.
+ * The envelope carries the signature that once framed a claim's id (`V-ENV`), so one
+ * framing now serves all three — and with it goes the case where a signature payload
+ * happened to read as a nameless multihash.
  */
 export class Id {
   readonly #raw: Uint8Array
@@ -56,17 +55,15 @@ export class Id {
   }
 
   /**
-   * algorithm names the scheme that built this id — "sha2-256" for a multihash,
-   * else the multicodec the leading varint names.
+   * algorithm names the hash that built this id — "sha2-256", the one `V-HASH` fixes.
    *
-   * An unnamed code renders as hex, where ranke-go prints the multicodec
-   * library's own rendering of it.
+   * An id framed any other way renders as the multicodec its leading varint names, or as
+   * hex where that names nothing: a value that reached here without being one.
    */
   algorithm(): string {
     if (decodeMultihash(this.#raw) !== null) return 'sha2-256'
     const v = readVarint(this.#raw, 0)
     if (v === null) return 'unknown'
-    if (v.value === CODE_EDDSA) return 'eddsa'
     if (v.value === CODE_ED25519_PUB) return 'ed25519-pub'
     return '0x' + v.value.toString(16)
   }

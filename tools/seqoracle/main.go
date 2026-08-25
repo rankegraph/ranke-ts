@@ -136,16 +136,26 @@ func frame(encoding string, records ...[]byte) string {
 	return hex.EncodeToString(buf.Bytes())
 }
 
-// buildClaim makes one identity-signed claim, so the fixture needs no key.
+// buildClaim makes one claim to frame. Every claim is signed (`V-SIG`), so the key is a
+// fixed seed rather than absent — which keeps the bytes reproducible, the only property the
+// keyless build was giving.
 func buildClaim() ranke.Claim {
 	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = byte(i)
+	}
 	priv := ed25519.NewKeyFromSeed(seed)
-	_ = priv
+	pubkey, err := ranke.EncodePublicKey(priv.Public())
+	must(err)
 	at := time.Date(2026, 1, 2, 3, 4, 5, 123456789, time.UTC)
 
-	root, err := ranke.NewClaim(ranke.NodeContributor, nil).WithCreatedAt(at).Sign()
+	root, err := ranke.NewClaim(ranke.NodeContributor, nil).
+		WithInlineContent(pubkey).
+		WithEncoding(ranke.EncodingOctetStream).
+		WithCreatedAt(at).
+		Sign(priv)
 	must(err)
-	contributor, err := root.AsContributor(context.Background(), nil)
+	contributor, err := root.AsContributor(context.Background(), nil, priv)
 	must(err)
 
 	claim, err := ranke.NewClaim(ranke.TypeSource("note"), contributor).
@@ -154,7 +164,7 @@ func buildClaim() ranke.Claim {
 		WithField("title", "sequenced").
 		WithCreatedAt(at.Add(time.Second)).
 		WithHeight(ranke.HeightOf(contributor)).
-		Sign()
+		Sign(priv)
 	must(err)
 	return claim
 }

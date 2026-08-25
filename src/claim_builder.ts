@@ -13,10 +13,10 @@ import {
   type EdgeRecord,
   type NodeRecord,
   claimFromRecord,
-  encodeClaimFromNode,
   encodeEdge,
   encodeNodeWithEdges,
 } from './codec.ts'
+import { encodeEnvelope, envelopeSigningInput } from './codec_envelope.ts'
 import type { ContentRef } from './content.ts'
 import {
   EdgeClassContribution,
@@ -60,11 +60,13 @@ export class RankeBuildError extends Error {
 export const maxInlineContent = 1 << 20 // 1 MiB
 
 /**
- * Signer turns the hash of a claim into a signature. The library never sees a private
- * key: an application holds one and passes this, so what ships here cannot leak it.
+ * Signer turns bytes into a signature. The library never sees a private key: an
+ * application holds one and passes this, so what ships here cannot leak it.
  *
- * `message` is the 34-byte SHA2-256 multihash of S(v) — the multihash, not the bare
- * digest, since that is what ranke-go signs.
+ * `message` is the envelope's signing input — the `Sig_structure` of RFC 9052 §4.4 over
+ * S(v) (`V-SIGN`), which this library builds so a caller needs no COSE of its own. Sign
+ * it with Ed25519 and return the 64 raw bytes; the scheme is named in the envelope's
+ * header, so the signature carries no framing (`V-ENV`).
  */
 export interface Signer {
   /** pubkey is the multikey encoding of the matching public key. */
@@ -243,13 +245,16 @@ export function newClaim(input: ClaimInput): { claim: Claim; bytes: Uint8Array; 
     record,
     edges.map((e) => e.raw),
   )
-  const hash = hashContent(node)
-  const id =
-    input.signer === undefined
-      ? hash
-      : idFromBytes(multikey(input.signer.sign(hash.rawBytes())))
-
-  const bytes = encodeClaimFromNode(node)
+  // The envelope is what gets stored and what the id hashes (`V-ENV`, `V-ID`). Sealed
+  // once: the same bytes are hashed for the id and kept as the record, so a claim cannot
+  // be stored under a name its own record does not answer to.
+  if (input.signer === undefined) {
+    throw new RankeBuildError(
+      'a claim is signed, so a signer is required — every contributor carries a pubkey (`V-SIG`)',
+    )
+  }
+  const bytes = encodeEnvelope(node, input.signer.sign(envelopeSigningInput(node)))
+  const id = hashContent(bytes)
   return { claim: claimFromRecord(record, id.toString()), bytes, id: id.toString() }
 }
 
@@ -327,35 +332,19 @@ function checkEdgeCardinality(edges: readonly BuiltEdge[]): void {
   if (diffs > 1) throw new RankeBuildError('a claim carries one contribution/diff edge')
 }
 
-// checkSigningConsistency matches the signer against the key the claim declares.
-// Neither present is identity Sign; one alone is an error (§5.7).
+// checkSigningConsistency matches the signer against the key the claim declares. Refused
+// here where the reason is known: a missing signer failed inside sealing otherwise, naming
+// envelopes rather than the key that was not passed.
 function checkSigningConsistency(signer: Uint8Array, declared: Uint8Array): void {
-  const hasSigner = signer.length > 0
-  const hasPubkey = declared.length > 0
-  if (!hasSigner && !hasPubkey) return // identity Sign
-  if (hasSigner && !hasPubkey) {
-    throw new RankeBuildError('a signer was given but the claim declares no public key')
+  if (signer.length === 0) {
+    throw new RankeBuildError('a claim is signed, so a signer is required (`V-SIG`)')
   }
-  if (!hasSigner && hasPubkey) {
-    throw new RankeBuildError(
-      'the claim declares a public key, so identity Sign will not verify — pass a signer',
-    )
+  if (declared.length === 0) {
+    throw new RankeBuildError('a signer was given but the claim declares no public key')
   }
   if (compareBytes(signer, declared) !== 0) {
     throw new RankeBuildError("the signer's public key is not the one the claim declares")
   }
-}
-
-// multikey frames a signature as ranke-go does: the Ed25519 multicodec as a varint,
-// which is two bytes, then the signature.
-// multikey frames a signature under eddsa (0xd0ed, varint ed a1 03), distinct from a
-// pubkey's ed25519-pub so neither reads as the other (`V-SIGN`).
-function multikey(signature: Uint8Array): Uint8Array {
-  const code = [0xed, 0xa1, 0x03]
-  const out = new Uint8Array(code.length + signature.length)
-  out.set(code, 0)
-  out.set(signature, code.length)
-  return out
 }
 
 function inlineOf(content: ContentRef | undefined): Uint8Array {

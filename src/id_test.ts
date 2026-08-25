@@ -71,27 +71,28 @@ test('equal compares by payload, not identity', () => {
   assert.ok(!a.equal(null))
 })
 
-// A node id is a signature, so it frames no multihash and the multicodec reading
-// names it. Taken from the generated fixtures rather than transcribed: this is the
-// only cross-check that ranke-ts reads the code ranke-go actually writes, so a
-// hand-copied id would leave the framing agreeing with itself alone.
-const goSignatureId = contributor.id
+// A claim id is a multihash like any other, the signature having moved inside the record
+// it attests (`V-ENV`). Taken from the generated fixtures rather than transcribed: this is
+// the only cross-check that ranke-ts reads the framing ranke-go actually writes, so a
+// hand-copied id would leave it agreeing with itself alone.
+const goClaimId = contributor.id
 
-test('algorithm names the scheme', () => {
+test('algorithm names the hash', () => {
   assert.equal(hashContent(Buffer.from('abc')).algorithm(), 'sha2-256')
-  assert.equal(parseId(goSignatureId).algorithm(), 'eddsa')
+  assert.equal(parseId(goClaimId).algorithm(), 'sha2-256')
 })
 
-// eddsa (0xd0ed) is three varint bytes, where the ed25519-pub it replaced was two.
-// A reader stopping short mis-frames every signature (`V-SIGN`).
-test('a signature id carries the eddsa varint', () => {
-  const raw = parseId(goSignatureId).rawBytes()
+// One framing for a claim, an edge and external content. 34 bytes where a signature
+// payload was 66, which is why a base32 id reads 56 characters and not 106.
+test('a claim id is a 34-byte multihash', () => {
+  const raw = parseId(goClaimId).rawBytes()
   assert.deepEqual(
-    Uint8Array.from(raw.subarray(0, 3)),
-    Uint8Array.from([0xed, 0xa1, 0x03]),
-    'the varint of 0xd0ed',
+    Uint8Array.from(raw.subarray(0, 2)),
+    Uint8Array.from([0x12, 0x20]),
+    'the sha2-256 multicodec, then the digest length',
   )
-  assert.equal(raw.length, 3 + 64, 'varint plus an Ed25519 signature')
+  assert.equal(raw.length, 34, 'the code, the length, a 32-byte digest')
+  assert.equal(goClaimId.length, 56, 'and 56 base32 characters')
 })
 
 // A pubkey keeps ed25519-pub, which is what makes the code alone tell the two

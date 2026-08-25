@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { type Claim, contributorOf } from './claim.ts'
-import { decodeClaim, nodePreimage } from './codec.ts'
+import { decodeClaim } from './codec.ts'
 import { contentSize } from './content.ts'
 import { hashContent, parseId } from './id.ts'
+import { compareBytes } from './internal/cbor.ts'
 import {
   type ArtifactSet,
   type ClaimCase,
@@ -92,20 +93,27 @@ function accepts(a: ArtifactSet, c: ClaimCase, closure: Map<string, Claim>): boo
   try {
     raw = readArtifact(a.root, c.file)
     parseId(c.id) // malformed_id: the pairing is part of what a case asserts
-    claim = decodeClaim(raw, c.id)
+    // edgeIds, since V-EORDER below compares them. Opt-in on the read path, so a caller
+    // that never addresses an edge pays no digest for one.
+    claim = decodeClaim(raw, c.id, { edgeIds: true })
   } catch {
     return false
   }
 
-  // An identity Sign makes the id the hash itself, which stands only where the signer
-  // publishes no key (§5.7) — and a signer's key is its content, so both halves are
-  // decidable without holding one.
-  const id = parseId(c.id)
-  if (id.algorithm() === 'sha2-256') {
-    if (!hashContent(nodePreimage(raw)).equal(id)) return false
-    const signer = signerOf(claim, closure)
-    if (signer === undefined) return false
-    if (contentSize(signer.content) > 0) return false
+  // `V-ID`: the id is H over the record as stored, so it is checkable with no key at all —
+  // where it used to be a signature, and only an identity-signed claim could be checked
+  // this way. Every case now answers here, and only `V-SIG` needs a contributor resolved.
+  if (!hashContent(raw).equal(parseId(c.id))) return false
+
+  // `V-EORDER`: the edges of the record AS STORED ascend by id(e). ranke-go checks this in
+  // its verifier, so it belongs here rather than in the decoder, which would pay a digest
+  // per edge on every read. Equal neighbours pass — the rule admits them.
+  const ids = claim.edges.map((e) => e.id)
+  for (let i = 1; i < ids.length; i++) {
+    const previous = ids[i - 1]
+    const current = ids[i]
+    if (previous === undefined || current === undefined) return false
+    if (compareBytes(parseId(previous).rawBytes(), parseId(current).rawBytes()) > 0) return false
   }
 
   let max = 0

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { RankeDecodeError } from './codec.ts'
+import { RankeDecodeError, decodeSerializedClaim } from './codec.ts'
 import {
   type ResultRecord,
   newSeqReader,
@@ -164,7 +164,9 @@ test('an empty stream yields nothing', () => {
 // own — it hands a record to the CBOR or the JSON decoder — and this is what says so, the
 // seq oracle exercising no content option.
 test('a withheld body keeps its size through either framing', () => {
-  const withheld = fx.capped.filter((c) => c.inline === 0)
+  // A served record is a serialized claim, so the held count is read rather than recorded.
+  const heldOf = (c: fx.Capped) => contentHeld(decodeSerializedClaim(fx.cborBytes(c), c.id).content)
+  const withheld = fx.capped.filter((c) => heldOf(c) === 0)
   assert.equal(withheld.length, 3, 'the options that serve a size and no bytes')
 
   for (const c of withheld) {
@@ -366,12 +368,17 @@ test('every cbor record kind is told apart by its major type', async () => {
 
   assert.deepEqual(
     records.map((r) => r.kind),
-    ['claim_id', 'path_id', 'claim', 'report'],
+    ['claim_id', 'path_id', 'envelope', 'report'],
   )
   const [id, route, claim, report] = records
   assert.equal(id?.kind === 'claim_id' ? id.id : null, fx.ids.source)
   assert.deepEqual(route?.kind === 'path_id' ? route.ids : null, [fx.ids.entity, fx.ids.source])
-  assert.equal(claim?.kind === 'claim' ? claim.claim.type : null, 'source/register')
+  assert.equal(claim?.kind === 'envelope' ? claim.claim.type : null, 'source/register')
+  assert.deepEqual(
+    claim?.kind === 'envelope' ? claim.bytes : null,
+    fx.cborBytes(fx.source),
+    'the stored bytes ride along, so a client can hash them against the id',
+  )
   assert.ok(report?.kind === 'report')
   assert.equal(report.report.results, 1)
   assert.equal(report.report.elapsed_ns, 1_500_000_000, 'nanoseconds, as the name says')
@@ -389,19 +396,12 @@ test('cbor records read at every chunk size', async () => {
   for (const size of [1, 3, 17, 64, 4096]) {
     const kinds: string[] = []
     for await (const rec of readRecords(bodyOf(bytes, size), 'cbor')) kinds.push(rec.kind)
-    assert.deepEqual(kinds, ['claim_id', 'claim', 'report'], `chunk ${size}`)
+    // The fixture is an envelope, so it reads as one — told apart by its tag, which is
+    // what `R-QSTREAM` requires of the two details that both carry a claim.
+    assert.deepEqual(kinds, ['claim_id', 'envelope', 'report'], `chunk ${size}`)
   }
 })
 
 test('the fixture labels are all present, so the stream covers each shape', () => {
-  assert.deepEqual(LABELS, [
-    'contributor',
-    'source',
-    'entity',
-    'relation',
-    'deletion',
-    'identity-root',
-    'identity-note',
-    'identity-derived',
-  ])
+  assert.deepEqual(LABELS, ['contributor', 'source', 'entity', 'relation', 'deletion'])
 })

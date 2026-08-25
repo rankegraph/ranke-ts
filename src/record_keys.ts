@@ -14,8 +14,9 @@
 /** RecordKind is the record a key belongs to: a node's or an edge's. */
 export type RecordKind = 'node' | 'edge'
 
-/** ClaimFileKeyNode is the key a claim file wraps its node record under. */
-export const ClaimFileKeyNode = 1
+// No key for a claim wrapper: a claim is stored as an envelope whose payload IS the node
+// record (`V-ENV`), where it used to be that record under key 1. Retired rather than
+// renumbered — @tbl:keys is untouched, so every number below means what it always did.
 
 // Keys 1 to 8 are the slots a node and an edge share, so one number means one thing in
 // either record. A node then takes 9 to 11 and an edge 12 to 13 (`V-SER`).

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { decodeClaim } from './codec.ts'
+import { encodeEnvelope, signatureLength } from './codec_envelope.ts'
 import { inspectClaim } from './inspect.ts'
 import { CborWriter, encodeText, encodeUint } from './internal/cbor.ts'
 import * as fx from './testing/fixtures.ts'
@@ -63,12 +64,11 @@ test('keys out of canonical order are reported at their offset', () => {
   w.writeRaw(encodeText('source'))
   const record = w.bytes()
 
-  const outer = new CborWriter()
-  outer.writeMapHeader(1)
-  outer.writeRaw(encodeUint(1))
-  outer.writeRaw(record)
+  // Sealed, since a claim is its envelope now — with a signature that verifies nothing,
+  // the fault under test being the record inside.
+  const outer = encodeEnvelope(record, new Uint8Array(signatureLength))
 
-  const seen = inspectClaim(outer.bytes())
+  const seen = inspectClaim(outer)
   assert.equal(seen.valid, false, 'the decoder refuses it')
   assert.equal(seen.claim, undefined, 'no claim comes back from broken bytes')
 
@@ -77,7 +77,7 @@ test('keys out of canonical order are reported at their offset', () => {
   assert.equal(order.path, 'node', 'the deviation names the record it is in')
   assert.ok(order.at > 0, 'the deviation carries an offset')
   // The offset points at the offending key, which is the byte holding 1.
-  assert.equal(outer.bytes()[order.at], 0x01, 'the offset points at the out-of-order key')
+  assert.equal(outer[order.at], 0x01, 'the offset points at the out-of-order key')
 
   // Both slots still rendered: reporting a deviation does not end the record.
   const node = seen.records.find((r) => r.path === 'node')
@@ -129,12 +129,7 @@ test('a key the table does not assign renders unnamed', () => {
   w.writeRaw(encodeUint(21))
   w.writeRaw(encodeText('from a later implementation'))
 
-  const outer = new CborWriter()
-  outer.writeMapHeader(1)
-  outer.writeRaw(encodeUint(1))
-  outer.writeRaw(w.bytes())
-
-  const seen = inspectClaim(outer.bytes())
+  const seen = inspectClaim(encodeEnvelope(w.bytes(), new Uint8Array(signatureLength)))
   const node = seen.records.find((r) => r.path === 'node')
   const slot = node?.slots.find((s) => s.key === 21)
   assert.ok(slot !== undefined, 'the slot renders')

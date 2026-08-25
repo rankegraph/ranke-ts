@@ -2,9 +2,9 @@
 #
 # Thin wrapper over the npm scripts, so the targets match ranke-go's.
 
-.PHONY: all install test typecheck build clean testdata-clean verify release fixtures \
+.PHONY: all install test typecheck build clean verify check release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
-	spec rule-citations major minor patch breaking feature fix
+	spec ranke-go-check rule-citations major minor patch breaking feature fix
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -17,6 +17,14 @@ all: typecheck test build
 
 install:
 	npm install
+
+# The stamp a fresh clone is missing: tsc and json2ts live here, and npm run /
+# npx resolve neither without it. Keyed on the lockfile, via `npm ci` rather than
+# `install`'s `npm install`, so this reproduces the exact versions CI checks out —
+# and reinstalls only when the lockfile actually moved, not on every invocation.
+node_modules: package-lock.json
+	npm ci
+	@touch node_modules
 
 # Node strips types, so the sources run as they are — no build before a test. The
 # script adds a floor: `node --test` exits 0 when its glob matches nothing.
@@ -43,7 +51,7 @@ bench:
 pull-rql-schema:
 	@./scripts/pull-rql-schema.sh
 
-generate:
+generate: node_modules
 	@./scripts/generate.sh
 
 # Refuses a release whose generated Query type no longer matches the committed
@@ -59,18 +67,14 @@ check-generated: generate
 	}
 
 # Covers the tests too, which the build config excludes.
-typecheck:
+typecheck: node_modules
 	npm run typecheck
 
-build:
+build: node_modules
 	npm run build
 
 clean:
 	rm -rf dist
-
-# Drop the cached artifact set, so the next run takes the current release.
-testdata-clean:
-	rm -rf testdata
 
 # Every rule id a comment cites is one the spec declares, and every declared rule is
 # cited or listed in scripts/rule-citations.allow with a reason. It says nothing about
@@ -89,14 +93,20 @@ rule-citations:
 spec:
 	@./scripts/fetch-spec.sh
 
+# ranke-go is the reference this library mirrors, so `verify` holds the pin to its latest
+# release and the fixtures to the pin. Asked of the module proxy over HTTP, so a freshness
+# question does not drag in the Go toolchain that keeps `fixtures` out of `verify`.
+#   make ranke-go-check RANKE_GO_LATEST=v0.24.0   # offline, or ahead of a release
+ranke-go-check:
+	@./scripts/check-ranke-go.sh
+
 # The gate a release must pass. ranke-go splits the fast checks from its full
 # suite; here the whole lot runs in under a second, so `verify` is `all`.
 #
-# It checks against the LATEST spec and the LATEST published vectors, taking both
-# before it checks anything: a spec that moved while this code did not means the code
-# is broken, and that is the finding rather than a false alarm. Both live behind
-# gitignored caches — $(PAPERS_DIR) and testdata/ — neither of which expires, so
-# without dropping them a run reports on whatever was fetched once, however long ago.
+# It checks against the LATEST spec, taken before it checks anything: a spec that moved
+# while this code did not means the code is broken, and that is the finding rather than a
+# false alarm. The reference claims ride in the same clone (`spec`), so the rules and the
+# claims exercising them cannot come from two different moments.
 #
 # The cost is that `verify` needs the network. Offline, name local copies instead:
 #   make verify RANKE_SPEC=path/to/spec.typ RANKE_TESTDATA_DIR=path/to/vectors
@@ -104,7 +114,11 @@ spec:
 # check-generated is here because it was documented as a release gate and run by
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
-verify: spec testdata-clean typecheck test build check-generated rule-citations
+verify: spec ranke-go-check typecheck test build check-generated rule-citations
+
+# The conventional name for the gate above — an alias, so both spellings run the
+# same checks and neither can drift from the other.
+check: verify
 
 # The version, which is the latest release tag: package.json carries 0.0.0 in the tree
 # and the release workflow stamps the tag's number in just before publishing. `--match`
