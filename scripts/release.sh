@@ -5,24 +5,27 @@
 # release workflow); then return to the branch you started on. It never leaves you
 # on — or commits directly to — the default branch, and refuses to run from it.
 #
-# Usage: git switch -c <branch> && make release <major|minor|patch>
-#   Aliases: breaking|feature|fix. Needs `gh`.
+# Usage: git switch -c <branch> && make release
+#   The version is not chosen: it follows the ranke-go in tools/go.mod
+#   (scripts/next-version.sh). Needs `gh`.
 #
 # '$default' is protected: a PR and a green `test` check are the only way in, so
 # the merge is queued with --auto and waited on. The repo therefore needs
 # auto-merge enabled (Settings → General → Allow auto-merge).
 set -euo pipefail
 
-bump="${1:-}"
-case "$bump" in
-	major | breaking) bump=major ;; # incompatible change
-	minor | feature)  bump=minor ;; # backwards-compatible feature
-	patch | fix)      bump=patch ;; # backwards-compatible fix
-	*)
-		echo "usage: make release <major|breaking | minor|feature | patch|fix>" >&2
-		exit 1
-		;;
-esac
+# No bump word: the version is DERIVED from the ranke-go this tree mirrors, so there is
+# nothing to choose. scripts/next-version.sh states the rule. A word passed anyway is
+# refused rather than ignored, since someone passing one believes they chose something.
+if [ "$#" -gt 0 ]; then
+	cat >&2 <<-MSG
+		release takes no bump word: the version follows the ranke-go in tools/go.mod,
+		so ranke-ts $(./scripts/next-version.sh) is what this release would be.
+
+		  make release
+	MSG
+	exit 1
+fi
 
 # 1. Clean tree — a release must capture a committed state.
 if [ -n "$(git status --porcelain)" ]; then
@@ -45,7 +48,7 @@ if [ "$start" = "$default" ]; then
 		merged, CI-checked code. Branch, then release:
 
 		  git switch -c <branch>
-		  make release $bump
+		  make release
 	MSG
 	exit 1
 fi
@@ -126,22 +129,14 @@ echo "rebasing '$start' onto origin/$default…"
 git checkout --quiet "$start"
 git rebase "origin/$default"
 
-# 4. Bump from the latest RELEASE tag (ignore non-semver / prerelease tags), tag
-#    the merged tip, push the tag.
-# `|| true`: on the first release there are no tags, so grep matches nothing and
-# exits 1; under `set -o pipefail` that aborts the assignment before the
-# `:-v0.0.0` fallback can apply. Swallow it so the fallback works.
+# 4. Take the version the ranke-go this tree mirrors fixes, tag the merged tip, push
+#    the tag. Derived rather than chosen: scripts/next-version.sh states the rule, and
+#    the tags it reads are the ones fetched at the top of this script.
+next="$(./scripts/next-version.sh)"
 latest="$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
 latest="${latest:-v0.0.0}"
-IFS=. read -r maj min pat <<<"${latest#v}"
-case "$bump" in
-	major) maj=$((maj + 1)); min=0; pat=0 ;;
-	minor) min=$((min + 1)); pat=0 ;;
-	patch) pat=$((pat + 1)) ;;
-esac
-next="v${maj}.${min}.${pat}"
 
-echo "tagging ${latest} -> ${next} on ${default}"
+echo "tagging ${latest} -> ${next} on ${default} (ranke-go's line)"
 git tag -a "$next" "$target" -m "release $next"
 
 # The run a tag push triggers is found by the commit it points at, and a commit
