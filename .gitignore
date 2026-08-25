@@ -5,9 +5,6 @@ node_modules/
 # fetched, never committed.
 docs/papers/
 
-# Reference artifacts fetched from the ranke-graph release — always fetched, never
-# vendored, so the set stays the spec's rather than a copy of it.
-testdata/
 
 # Local Claude config
 /.claude/

@@ -2,7 +2,7 @@
 #
 # Thin wrapper over the npm scripts, so the targets match ranke-go's.
 
-.PHONY: all install test typecheck build clean testdata-clean verify check release fixtures \
+.PHONY: all install test typecheck build clean verify check release fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
 	spec rule-citations major minor patch breaking feature fix
 
@@ -76,10 +76,6 @@ build: node_modules
 clean:
 	rm -rf dist
 
-# Drop the cached artifact set, so the next run takes the current release.
-testdata-clean:
-	rm -rf testdata
-
 # Every rule id a comment cites is one the spec declares, and every declared rule is
 # cited or listed in scripts/rule-citations.allow with a reason. It says nothing about
 # whether a citation is TRUE — a text comparison cannot. Needs the spec, so `make docs`
@@ -100,11 +96,10 @@ spec:
 # The gate a release must pass. ranke-go splits the fast checks from its full
 # suite; here the whole lot runs in under a second, so `verify` is `all`.
 #
-# It checks against the LATEST spec and the LATEST published vectors, taking both
-# before it checks anything: a spec that moved while this code did not means the code
-# is broken, and that is the finding rather than a false alarm. Both live behind
-# gitignored caches — $(PAPERS_DIR) and testdata/ — neither of which expires, so
-# without dropping them a run reports on whatever was fetched once, however long ago.
+# It checks against the LATEST spec, taken before it checks anything: a spec that moved
+# while this code did not means the code is broken, and that is the finding rather than a
+# false alarm. The reference claims ride in the same clone (`spec`), so the rules and the
+# claims exercising them cannot come from two different moments.
 #
 # The cost is that `verify` needs the network. Offline, name local copies instead:
 #   make verify RANKE_SPEC=path/to/spec.typ RANKE_TESTDATA_DIR=path/to/vectors
@@ -112,7 +107,7 @@ spec:
 # check-generated is here because it was documented as a release gate and run by
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
-verify: spec testdata-clean typecheck test build check-generated rule-citations
+verify: spec typecheck test build check-generated rule-citations
 
 # The conventional name for the gate above — an alias, so both spellings run the
 # same checks and neither can drift from the other.

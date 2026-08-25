@@ -32,6 +32,10 @@ github.com/flocko-motion/ranke-go v0.20.0 h1:U4KG+SbE+yavQ7CwuwU45OZw52T31DKKJd2
 github.com/flocko-motion/ranke-go v0.20.0/go.mod h1:Mx/cYAmJMYfJ5hgq9F1PMjx0PLX/rc6FIMEVPzypxrM=
 github.com/flocko-motion/ranke-go v0.21.0 h1:orwAYPACyCm0RAGG3xi4ADbu1MO5K7TG76ND10FcC2Q=
 github.com/flocko-motion/ranke-go v0.21.0/go.mod h1:Mx/cYAmJMYfJ5hgq9F1PMjx0PLX/rc6FIMEVPzypxrM=
+github.com/flocko-motion/ranke-go v0.22.0 h1:nu5uO4UuaXymI+MT2vdoeEujBSd6YrT8DZHbea7kJI4=
+github.com/flocko-motion/ranke-go v0.22.0/go.mod h1:z1+tUmvR/wilTApzrABSkyNTmHvXAeGcKxDha9GNgGk=
+github.com/flocko-motion/ranke-go v0.24.0 h1:zGchyvfRrsGDU+dRexeQlePBBeML6vQPpi2SjPkD4XI=
+github.com/flocko-motion/ranke-go v0.24.0/go.mod h1:z1+tUmvR/wilTApzrABSkyNTmHvXAeGcKxDha9GNgGk=
 github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh78=
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/klauspost/cpuid/v2 v2.0.4/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
@@ -60,6 +64,8 @@ github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0b
 github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+github.com/veraison/go-cose v1.3.0 h1:2/H5w8kdSpQJyVtIhx8gmwPJ2uSz1PkyWFx0idbd7rk=
+github.com/veraison/go-cose v1.3.0/go.mod h1:df09OV91aHoQWLmy1KsDdYiagtXgyAwAl8vFeFn1gMc=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e h1:T8NU3HyQ8ClP4SEE+KbFlg6n0NhuTsN4MyznaarGsZM=

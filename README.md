@@ -292,15 +292,18 @@ Each records the ranke-go release it came from, and the suite refuses a set that
 names no release. A hand-copied fixture is one nibble from testing the wrong
 thing, which is how this rule was learnt.
 
-**Conformance runs against the published set.** ranke-graph releases
-`ranke-testdata.tar.gz`, whose manifest names 14 claim cases and 2 content blobs
-and what each must do. The suite fetches it and holds this library to it, so
-conformance is measured against the spec's artifact rather than against agreement
-with a sibling. Thirteen of the sixteen are decidable without a key: every valid
-decode, a malformed id, a height that does not follow, a reference that resolves
-nowhere, an identity Sign whose signer publishes a key, and both blobs against
-the hash they are filed under. The three that turn on a signature are named
-individually in the test, so a case becoming undecidable for a new reason fails
+**Conformance runs against ranke-graph's reference claims.** Their manifest names each
+case and what it must do, so conformance is measured against the spec's artifact rather
+than against agreement with a sibling. They come from the clone `make spec` takes,
+beside the spec itself: the rules and the claims exercising them are then always from
+one moment, where a released bundle would lag the spec and let a change that ought to
+break this library pass unremarked.
+
+Most cases are decidable with no key at all, `V-ID` being a hash over the stored bytes —
+every valid decode, a malformed id, a height that does not follow, a reference that
+resolves nowhere, a claim stored without its envelope, edges stored out of order, and
+each content blob against the hash it is filed under. Those that turn on a signature are
+named individually in the test, so a case becoming undecidable for a new reason fails
 rather than passes quietly. Set `RANKE_TESTDATA_DIR` to work offline.
 
 ## Development
@@ -317,11 +320,11 @@ make docs       # fetch the papers and the spec, for reading
 make verify     # the gate a release must pass
 ```
 
-`verify` takes the latest spec and the latest published vectors before it checks
-anything. Both otherwise sit behind gitignored caches that never expire, so a run would
-report on whatever was fetched once, however long ago. A spec that moved while this code
-did not means the code is broken, and that is the finding rather than a false alarm — so
-the gate needs the network, and offline you name local copies instead:
+`verify` takes the latest spec before it checks anything, and the reference claims ride
+in the same clone. Otherwise the papers sit behind a gitignored copy that never expires,
+so a run would report on whatever was fetched once, however long ago. A spec that moved
+while this code did not means the code is broken, and that is the finding rather than a
+false alarm — so the gate needs the network, and offline you name local copies instead:
 
 ```sh
 make verify RANKE_SPEC=path/to/spec.typ RANKE_TESTDATA_DIR=path/to/vectors

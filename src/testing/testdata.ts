@@ -1,20 +1,20 @@
 // package: testing / testdata
 // type:    io
-// job:     resolving ranke-graph's published reference-artifact set — fetch, unpack, read the
-// manifest
-// limits:  transport and schema; running the cases is vectors_test.ts's
+// job:     resolving ranke-graph's reference-artifact set — locate it, read the manifest
+// limits:  location and schema; running the cases is vectors_test.ts's
 //
 // Mirrors ranke-go's internal/vectors. The set is the spec's artifact rather than
 // either implementation's, so running it is what lets ranke-ts fail conformance —
 // and it is the only reference data here carrying cases that must be REFUSED.
+//
+// It comes from the papers `make spec` fetches, which is where the SPEC comes from, so the
+// rules and the claims that exercise them move together. Sourcing the claims from a release
+// instead let the two drift: the code would be checked against today's spec and a bundle
+// cut whenever the last release was, and a changed spec that ought to break this library
+// would pass unremarked. The published tarball says the same thing a release behind.
 
-import { gunzipSync } from 'node:zlib'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-
-/** LatestURL serves the newest published artifact set. */
-export const LatestURL =
-  'https://github.com/flocko-motion/ranke-graph/releases/latest/download/ranke-testdata.tar.gz'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 /** MANIFEST is the manifest's filename inside a set. */
 export const MANIFEST = 'manifest.json'
@@ -72,51 +72,33 @@ export interface ArtifactSet {
   readonly origin: string
 }
 
-// TESTDATA_DIR names an already-extracted set, for working offline or against one
-// not yet published. TESTDATA_URL overrides the source, for a fork or a staged
-// release.
+// RANKE_TESTDATA_DIR names a set of your own, for working offline or against one not
+// published yet.
 const DIR_ENV = 'RANKE_TESTDATA_DIR'
-const URL_ENV = 'RANKE_TESTDATA_URL'
 
-const cacheRoot = new URL('../../testdata/', import.meta.url).pathname
+// Where `make docs` puts ranke-graph's reference claims, beside the spec it fetches in the
+// same clone. A path rather than a download: one fetch, one source, no second copy to age.
+const papersSet = new URL('../../docs/papers/01-ranke-graph/testdata/cbor/', import.meta.url)
+  .pathname
 
 /**
- * resolveArtifacts returns the set: the directory RANKE_TESTDATA_DIR names, else the
- * published bundle, downloaded once and cached.
+ * resolveArtifacts returns the set: the directory RANKE_TESTDATA_DIR names, else the one
+ * beside the fetched papers.
  *
- * An unreachable set is an error and never a skip: silently not checking conformance
- * is the one outcome worse than a red run.
+ * An absent set is an error and never a skip: silently not checking conformance is the one
+ * outcome worse than a red run.
  */
 export async function resolveArtifacts(): Promise<ArtifactSet> {
   const named = process.env[DIR_ENV]
   if (named !== undefined && named !== '') {
     return { root: named, manifest: loadManifest(named), origin: `${DIR_ENV}=${named}` }
   }
-
-  const url = process.env[URL_ENV] ?? LatestURL
-  const extracted = join(cacheRoot, 'vectors')
-  if (existsSync(join(extracted, MANIFEST))) {
-    return { root: extracted, manifest: loadManifest(extracted), origin: `cache of ${url}` }
+  if (!existsSync(join(papersSet, MANIFEST))) {
+    throw new Error(
+      `no reference claims at ${papersSet} — run 'make docs', or point ${DIR_ENV} at a set`,
+    )
   }
-
-  const tarball = join(cacheRoot, 'ranke-testdata.tar.gz')
-  let gz: Uint8Array
-  if (existsSync(tarball)) {
-    gz = readFileSync(tarball)
-  } else {
-    const res = await fetch(url)
-    if (!res.ok) {
-      throw new Error(
-        `fetch ${url}: ${res.status} ${res.statusText} — point ${DIR_ENV} at an extracted set to work offline`,
-      )
-    }
-    gz = new Uint8Array(await res.arrayBuffer())
-    mkdirSync(dirname(tarball), { recursive: true })
-    writeFileSync(tarball, gz)
-  }
-
-  const root = unpack(gz, extracted)
-  return { root, manifest: loadManifest(root), origin: url }
+  return { root: papersSet, manifest: loadManifest(papersSet), origin: `papers at ${papersSet}` }
 }
 
 function loadManifest(dir: string): Manifest {
@@ -128,53 +110,3 @@ export function readArtifact(root: string, file: string): Uint8Array {
   return readFileSync(join(root, file))
 }
 
-// unpack extracts a gzipped ustar archive into dest and returns the directory holding
-// the manifest. Hand-rolled: the format is 512-byte headers and padded bodies, and a
-// tar dependency for a test fixture is not worth the supply chain.
-function unpack(gz: Uint8Array, dest: string): string {
-  const tar = new Uint8Array(gunzipSync(gz))
-  let manifestDir = dest
-  let at = 0
-
-  while (at + 512 <= tar.length) {
-    const header = tar.subarray(at, at + 512)
-    // Two zero blocks end the archive; one is enough to stop reading.
-    if (header.every((b) => b === 0)) break
-    at += 512
-
-    const name = cstr(header.subarray(0, 100))
-    const prefix = cstr(header.subarray(345, 500))
-    const path = prefix === '' ? name : `${prefix}/${name}`
-    const size = octal(header.subarray(124, 136))
-    const kind = header[156] ?? 0
-
-    const target = join(dest, stripLeadingDir(path))
-    if (kind === 0x35 /* '5' */ || path.endsWith('/')) {
-      mkdirSync(target, { recursive: true })
-    } else {
-      mkdirSync(dirname(target), { recursive: true })
-      writeFileSync(target, tar.subarray(at, at + size))
-      if (stripLeadingDir(path) === MANIFEST) manifestDir = dest
-    }
-    // Bodies are padded to a 512-byte boundary.
-    at += Math.ceil(size / 512) * 512
-  }
-  return manifestDir
-}
-
-// The bundle wraps everything in one directory, which the manifest's own paths do not
-// include, so it is dropped.
-function stripLeadingDir(path: string): string {
-  const slash = path.indexOf('/')
-  return slash < 0 ? path : path.slice(slash + 1)
-}
-
-function cstr(b: Uint8Array): string {
-  const end = b.indexOf(0)
-  return new TextDecoder().decode(end < 0 ? b : b.subarray(0, end)).trim()
-}
-
-function octal(b: Uint8Array): number {
-  const text = cstr(b).replace(/\0/g, '').trim()
-  return text === '' ? 0 : Number.parseInt(text, 8)
-}

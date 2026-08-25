@@ -102,9 +102,12 @@ existing entry; append only.
   version is recorded in the file. `tools/go.mod` therefore carries no `replace`
   and no `go.work`: take new behaviour by releasing ranke-go and bumping the
   requirement.
-- `vectors_test.ts` runs ranke-graph's published set, which is the spec's artifact
+- `vectors_test.ts` runs ranke-graph's reference claims, which are the spec's artifact
   and the only reference data here with cases that must be REFUSED. Agreement on
   what to accept says nothing about what a reader lets through. A case this
   library cannot decide is named individually, never skipped by category.
+  They come from the clone `make spec` takes, beside the spec itself, so the rules and
+  the claims exercising them are always from one moment. Sourcing them from a release
+  let the two drift, and a changed spec that ought to break this library passed.
 - An unreachable artifact set is a failure, not a skip: silently not checking
   conformance is the one outcome worse than a red run.
