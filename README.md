@@ -38,7 +38,14 @@ same bytes ranke-go produces, which the tests assert byte for byte.
 ```ts
 import { contributorFrom, heightOf, newClaim } from '@flocko-motion/ranke'
 
-const root = newClaim({ type: 'contribution/contributor', createdAt: at })
+// A contributor carries the pubkey its claims are signed under, and every claim is
+// signed — so a signer goes with every build.
+const root = newClaim({
+  type: 'contribution/contributor',
+  content: { kind: 'inline', bytes: pubkey, size: pubkey.length, encoding: 'application/octet-stream' },
+  createdAt: at,
+  signer,
+})
 const alice = contributorFrom(root.claim)
 
 const note = newClaim({
@@ -48,17 +55,18 @@ const note = newClaim({
   fields: { title: 'a note' },
   height: heightOf(root.claim),
   createdAt: at,
+  signer,
 })
 
-note.id      // "bciq…" — H(S(v)), since nothing signed it
-note.bytes   // exactly what the id commits to
+note.id      // "bciq…" — H(S(env(v))), the hash of the stored record
+note.bytes   // the envelope: exactly what the id commits to
 note.claim   // the same claim a decode of those bytes yields
 ```
 
-Two claims above are **identity-signed**: with no key involved the id is the hash
-itself, which §5.7 admits wherever the contributor publishes none. That is what a
-mock graph wants, and it is also the only case a keyless library can reproduce
-whole — which is how the builder is tested against ranke-go.
+The id is a hash of the bytes, so **anyone can recompute it without a key** — which
+is what `V-ID` separates from `V-SIG`, where a signature once had to be checked to
+know an id at all. It is also how the builder is tested against ranke-go: every
+fixture is reproducible, not merely the keyless ones there used to be.
 
 **A key stays with the application.** Pass a `signer` and the library never sees
 it:
@@ -68,19 +76,20 @@ const signed = newClaim({
   type: 'contribution/contributor',
   content: { kind: 'inline', bytes: pubkey, size: pubkey.length, encoding: 'application/octet-stream' },
   createdAt: at,
-  signer: { pubkey, sign: (message) => /* Ed25519 over these 34 bytes */ },
+  signer: { pubkey, sign: (message) => /* Ed25519 over these bytes, raw */ },
 })
 ```
 
-The message handed to `sign` is the 34-byte SHA2-256 **multihash** of S(v), not
-the bare digest — that is what ranke-go signs, so a WebCrypto caller must pass
-those bytes through unchanged.
+The message handed to `sign` is the envelope's signing input — the `Sig_structure` of
+RFC 9052 §4.4 over S(v) (`V-SIGN`). The library builds it, so a WebCrypto caller signs
+the bytes it is handed and needs no COSE of its own. Return the 64 raw bytes: the
+scheme is named in the envelope's header, so the signature carries no framing.
 
 The builder enforces what construction can: the type vocabularies, the
 inline-or-addressed content rule with its mandatory encoding, one contributor edge
 and one diff edge, named edges on a diff claim, the canonical edge order,
-R-DPLANNED on an edge whose target is scheduled, and that a claim declaring a key
-cannot identity-sign.
+R-DPLANNED on an edge whose target is scheduled, and that the signer's key is the one
+the claim declares. A build with no signer is refused, every claim being signed.
 
 It does not require a derivation, entity or relation claim to carry a
 `derivation/*` edge. A retired rule said so; the spec's ADT rules are the
@@ -193,8 +202,9 @@ into "this claim has nothing", which is the same answer to two different questio
 
 ## Record keys
 
-A claim serializes as a CBOR map under the numeric keys `V-SER` fixes, and a tool
-rendering those bytes needs them by name. `record_keys.ts` exports the table:
+Inside its envelope, a claim serializes as a CBOR map under the numeric keys `V-SER`
+fixes, and a tool rendering those bytes needs them by name. `record_keys.ts` exports
+the table:
 
 ```ts
 import { NodeRecordKeys, EdgeRecordKeys, recordKeyName } from '@flocko-motion/ranke'
@@ -213,6 +223,10 @@ number has no name, so a reader shows it as the number rather than guessing.
 The codec reads these same constants, which is what makes the exported table the
 one a decode uses. Never transcribe it: a second copy of the numbering is free to
 drift from the encoder, and an id is computed over the encoded bytes.
+
+The table itself is unchanged by the envelope; what went is the key a claim used to be
+wrapped under, the payload now being the record. `envelopePayload` unwraps a stored
+claim to the bytes these keys index.
 
 ## Inspecting broken bytes
 

@@ -23,7 +23,6 @@ import {
   nodeSubtypeToAlias,
 } from './node_taxonomy.ts'
 import {
-  ClaimFileKeyNode,
   EdgeKeyReference,
   EdgeKeyRelationDirection,
   NodeKeyCreatedAt,

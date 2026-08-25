@@ -42,9 +42,11 @@ Reading claims a server served, building claims, and building the queries that a
 for them. No key material, no storage, no diff materialisation, no query
 *execution* — see README.md for why each is out.
 
-Signing is injected: a `Signer` turns the 34-byte multihash of S(v) into a
-signature, so an application's key never enters this library. Without one a claim
-is identity-signed, which §5.7 admits wherever the contributor publishes no key.
+Signing is injected: a `Signer` turns the envelope's signing input — the
+`Sig_structure` of RFC 9052 §4.4, which this library builds — into a signature, so an
+application's key never enters this library and a caller needs no COSE of its own.
+Every claim is signed (`V-SIG`): `Sign` is asymmetric, so a keyless build is refused,
+and a contributor claim carries the pubkey it signs under.
 
 A client sends queries, so the RankeQL `Query` type, its encoder and its shape
 checks belong here; executing one needs the graph and is RankeDB's. Mirror
@@ -60,9 +62,10 @@ A feature that would hold key material or reach a store does not belong here.
 
 The encoder must produce ranke-go's bytes exactly: an id is computed over them, so
 one byte apart is a different claim. `codec_encode_test.ts` re-encodes every fixture
-and compares against `nodePreimage` of ranke-go's own output, which needs no key;
-`claim_builder_test.ts` rebuilds the identity-signed fixtures and compares ids.
-Never change the encoder without those passing.
+and compares against `envelopePayload` of ranke-go's own output, then re-seals with the
+signature the fixture carries and compares the envelope and its id — all without a key.
+`claim_builder_test.ts` rebuilds fixtures outright, signing with the seed the generator
+uses. Never change the encoder without those passing.
 
 # The alias tables are normative
 
