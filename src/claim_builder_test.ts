@@ -660,6 +660,27 @@ test('an invalid field name is refused', () => {
   )
 })
 
+// `dated` denotes an interval rather than an instant (`V-DATED`), so — unlike createdAt — a
+// value wider than a bare RFC 3339 timestamp is admitted, and the claim keeps it as given.
+test('dated is EDTF or an RFC 3339 instant, and travels through unchanged', () => {
+  const contributor = root()
+  const { claim } = newClaim({
+    type: 'source/note',
+    contributor,
+    createdAt: AT_SOURCE,
+    dated: '2014-06-15T09:30:00+02:00',
+  })
+  assert.equal(claim.dated, '2014-06-15T09:30:00+02:00')
+
+  const undated = newClaim({ type: 'source/note', contributor, createdAt: AT_SOURCE }).claim
+  assert.equal(undated.dated, undefined, 'absence is no violation — dated is optional')
+
+  assert.throws(
+    () => newClaim({ type: 'source/note', contributor, createdAt: AT_SOURCE, dated: 'whenever' }),
+    RankeBuildError,
+  )
+})
+
 // --- helpers ---
 
 test('heightOf is one above the highest it cites', () => {

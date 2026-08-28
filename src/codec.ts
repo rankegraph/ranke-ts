@@ -26,6 +26,7 @@ import {
   EdgeKeyReference,
   EdgeKeyRelationDirection,
   NodeKeyCreatedAt,
+  NodeKeyDated,
   NodeKeyEdges,
   NodeKeyHeight,
   RecordKeyContent,
@@ -39,6 +40,7 @@ import {
 } from './record_keys.ts'
 import { envelopePayload } from './codec_envelope.ts'
 import { checkTimestampFields, validRFC3339Nano } from './time_fields.ts'
+import { validateDated } from './edtf.ts'
 import {
   CborReader,
   CborWriter,
@@ -216,6 +218,15 @@ function decodeNode(raw: Uint8Array, id: string, opts: DecodeOptions): Claim {
   const createdAt = text(m.get(NodeKeyCreatedAt))
   if (createdAt === '') throw new RankeDecodeError('a node record states no created_at')
 
+  // `V-DATED`: absence is no violation — dated is optional — so only a present value that
+  // will not parse is refused.
+  const dated = text(m.get(NodeKeyDated))
+  if (dated !== '' && !validateDated(dated)) {
+    throw new RankeDecodeError(
+      `dated is neither an RFC 3339 timestamp nor a valid EDTF Level 1 value: dated=${dated}`,
+    )
+  }
+
   const edgesRaw = m.get(NodeKeyEdges)
   const edges = edgesRaw === undefined ? [] : decodeEdges(edgesRaw, opts)
 
@@ -227,6 +238,7 @@ function decodeNode(raw: Uint8Array, id: string, opts: DecodeOptions): Claim {
     createdAt,
     createdAtMs: parseCreatedAt(createdAt),
     height: uint(m.get(NodeKeyHeight)),
+    ...(dated === '' ? {} : { dated }),
     fields: fields(m.get(RecordKeyFields)),
     content: content(
       bytes(m.get(RecordKeyContent)),
@@ -318,6 +330,7 @@ export function claimFromRecord(n: NodeRecord, id: string): Claim {
     createdAt: n.createdAt,
     createdAtMs: parseCreatedAt(n.createdAt),
     height: n.height,
+    ...(n.dated === undefined || n.dated === '' ? {} : { dated: n.dated }),
     fields: fieldsInWireOrder(n.fields),
     content: contentFromRef(n.content),
     edges: Object.freeze((n.edges ?? []).map(edgeFromRecord)),
@@ -406,6 +419,8 @@ export interface NodeRecord {
   /** RFC 3339 with fixed-width nanoseconds in UTC, which is what keeps S(v) stable. */
   readonly createdAt: string
   readonly height: number
+  /** EDTF Level 1, or an RFC 3339 instant — the time the subject stems from (`V-DATED`). */
+  readonly dated?: string
   readonly fields?: Readonly<Record<string, string>>
   readonly content?: ContentRef
   readonly edges?: readonly EdgeRecord[]
@@ -476,6 +491,9 @@ export function encodeNodeWithEdges(n: NodeRecord, edges: readonly Uint8Array[])
     [encodeUint(NodeKeyCreatedAt), encodeText(n.createdAt)],
   ]
   if (n.height !== 0) entries.push([encodeUint(NodeKeyHeight), encodeUint(n.height)])
+  if (n.dated !== undefined && n.dated !== '') {
+    entries.push([encodeUint(NodeKeyDated), encodeText(n.dated)])
+  }
   const fields = encodeFields(n.fields)
   if (fields !== null) entries.push([encodeUint(RecordKeyFields), fields])
   pushContent(entries, n.content, {

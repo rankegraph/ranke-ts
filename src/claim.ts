@@ -53,6 +53,12 @@ export interface Claim {
   readonly createdAtMs: number
   /** The generation number: 1 + max(reference heights), 0 for an initial node (§4.1). */
   readonly height: number
+  /**
+   * EDTF Level 1, or an RFC 3339 instant — the time the claim's subject stems from
+   * (`V-DATED`). Absent when the node carries none. Unlike createdAt this denotes an
+   * interval rather than an instant, so no lossy millisecond projection is offered here.
+   */
+  readonly dated?: string
   /** The claim's own fields, keyed as the taxonomy names them; wire aliases resolved. */
   readonly fields: Readonly<Record<string, string>>
   readonly content: ContentRef
