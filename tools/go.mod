@@ -6,11 +6,11 @@
 // rule ranke-graph's update-testdata follows. Take new behaviour by releasing
 // ranke-go and bumping the require below; the version lands in the generated file's
 // provenance, and the suite refuses fixtures that came from anything else.
-module github.com/flocko-motion/ranke-ts/tools
+module github.com/rankegraph/ranke-ts/tools
 
 go 1.26.2
 
-require github.com/flocko-motion/ranke-go v0.24.0
+require github.com/rankegraph/ranke-go v0.26.0
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect

@@ -226,7 +226,7 @@ function read(bytes: Uint8Array, n: number): Read {
 // the same way a fixture is: the reference implementation it was measured against.
 function rankeGoVersion(): string {
   const mod = readFileSync(new URL('../../tools/go.mod', import.meta.url), 'utf8')
-  const found = /^\s*require\s+github\.com\/flocko-motion\/ranke-go\s+(v\S+)/m.exec(mod)
+  const found = /^\s*require\s+github\.com\/rankegraph\/ranke-go\s+(v\S+)/m.exec(mod)
   return found?.[1] ?? 'unknown — tools/go.mod names no ranke-go release'
 }
 

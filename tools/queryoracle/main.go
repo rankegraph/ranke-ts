@@ -17,10 +17,10 @@ import (
 	"os"
 	"runtime/debug"
 
-	ranke "github.com/flocko-motion/ranke-go"
+	ranke "github.com/rankegraph/ranke-go"
 )
 
-const rankeGoModule = "github.com/flocko-motion/ranke-go"
+const rankeGoModule = "github.com/rankegraph/ranke-go"
 
 type verdict struct {
 	// Label says what the case exercises, so a disagreement reads as a sentence.

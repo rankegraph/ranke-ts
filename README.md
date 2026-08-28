@@ -4,8 +4,8 @@ TypeScript reader for the **Ranke-Graph** ADT (spec §4) — a content-addressed
 provenance-carrying graph of attributed claims.
 
 The project home, papers, and cross-language conformance suite live at
-[github.com/flocko-motion/ranke-graph](https://github.com/flocko-motion/ranke-graph).
-[ranke-go](https://github.com/flocko-motion/ranke-go) is the reference
+[github.com/rankegraph/ranke-graph](https://github.com/rankegraph/ranke-graph).
+[ranke-go](https://github.com/rankegraph/ranke-go) is the reference
 implementation; this repository mirrors the part of it a browser needs, file for
 file and name for name, so the two can be read side by side.
 
@@ -36,7 +36,7 @@ deliberate:
 same bytes ranke-go produces, which the tests assert byte for byte.
 
 ```ts
-import { contributorFrom, heightOf, newClaim } from '@flocko-motion/ranke'
+import { contributorFrom, heightOf, newClaim } from '@rankegraph/ranke'
 
 // A contributor carries the pubkey its claims are signed under, and every claim is
 // signed — so a signer goes with every build.
@@ -102,7 +102,7 @@ document ranke-go implements and ranke-db's `openapi.yaml` references — so
 TypeScript holds no second copy of the read language.
 
 ```ts
-import { EncodeQuery, ValidateQuery, type Query } from '@flocko-motion/ranke'
+import { EncodeQuery, ValidateQuery, type Query } from '@rankegraph/ranke'
 
 const q: Query = {
   select: { branch: 'project_x', path: [{ edges: ['derivation/*'], max: 3 }] },
@@ -139,7 +139,7 @@ three, so the generated type refuses them without a rule of its own.
 ## Install
 
 ```sh
-npm install @flocko-motion/ranke
+npm install @rankegraph/ranke
 ```
 
 ## A decoded claim is plain data
@@ -207,7 +207,7 @@ fixes, and a tool rendering those bytes needs them by name. `record_keys.ts` exp
 the table:
 
 ```ts
-import { NodeRecordKeys, EdgeRecordKeys, recordKeyName } from '@flocko-motion/ranke'
+import { NodeRecordKeys, EdgeRecordKeys, recordKeyName } from '@rankegraph/ranke'
 
 NodeRecordKeys.get(9)            // "created_at"
 NodeRecordKeys.get(6)            // "content"

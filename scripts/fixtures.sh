@@ -10,7 +10,7 @@
 #
 # To pick up new ranke-go behaviour, release ranke-go, then:
 #
-#   cd tools && go get github.com/flocko-motion/ranke-go@vX.Y.Z && cd .. && scripts/fixtures.sh
+#   cd tools && go get github.com/rankegraph/ranke-go@vX.Y.Z && cd .. && scripts/fixtures.sh
 #
 # The version lands in the generated file's provenance, and a test refuses anything
 # that did not come from a release.

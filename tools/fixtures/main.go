@@ -9,10 +9,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	ranke "github.com/flocko-motion/ranke-go"
+	ranke "github.com/rankegraph/ranke-go"
 )
 
-const rankeGoModule = "github.com/flocko-motion/ranke-go"
+const rankeGoModule = "github.com/rankegraph/ranke-go"
 
 // provenance records which ranke-go produced these bytes, so an artifact traces to
 // a version rather than to whatever was checked out at the time.

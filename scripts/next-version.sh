@@ -27,7 +27,7 @@ cd "$(dirname "$0")/.."
 # PINNED and TAGS are the two inputs, overridable so the rule above can be exercised
 # against the worked examples rather than only against this checkout — see
 # scripts/next-version-test.sh.
-module="github.com/flocko-motion/ranke-go"
+module="github.com/rankegraph/ranke-go"
 pinned="${PINNED:-}"
 if [ -z "$pinned" ]; then
 	pinned="$(grep -oE "$module v[0-9]+\.[0-9]+\.[0-9]+" tools/go.mod |

@@ -26,7 +26,7 @@ cd "$(dirname "$0")/.."
 
 gomod="tools/go.mod"
 fixtures="src/testing/claim_fixtures.json"
-module="github.com/flocko-motion/ranke-go"
+module="github.com/rankegraph/ranke-go"
 
 pinned="$(grep -oE "$module v[0-9]+\.[0-9]+\.[0-9]+" "$gomod" | grep -oE 'v[0-9.]+' | head -n1)"
 if [ -z "$pinned" ]; then
