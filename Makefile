@@ -2,7 +2,7 @@
 #
 # Thin wrapper over the npm scripts, so the targets match ranke-go's.
 
-.PHONY: all install test typecheck build clean verify check release fixtures \
+.PHONY: all install test typecheck build clean verify check release check-clean-tree fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
 	spec ranke-go-check rule-citations next-version next-version-check \
 	major minor patch breaking feature fix
@@ -149,7 +149,12 @@ next-version-check:
 #
 # Usage: make release. There is no bump word to pass — the version follows the ranke-go
 # this tree mirrors, so nothing about it is a judgement to make at release time.
-release: verify
+# check-clean-tree first, ahead of verify: a dirty tree is a free, instant check,
+# and verify is not — failing on it should not cost a build first.
+check-clean-tree:
+	@[ -z "$$(git status --porcelain)" ] || { echo "working tree is dirty — commit or stash before releasing" >&2; exit 1; }
+
+release: check-clean-tree verify
 	@./scripts/release.sh $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
 
 # Absorb a bump word so `make release patch` reaches release.sh, which refuses it by name

@@ -27,18 +27,12 @@ if [ "$#" -gt 0 ]; then
 	exit 1
 fi
 
-# 1. Clean tree — a release must capture a committed state.
-if [ -n "$(git status --porcelain)" ]; then
-	echo "working tree is dirty — commit or stash before releasing" >&2
-	exit 1
-fi
-
 git fetch --tags --force origin >/dev/null 2>&1 || true
 default="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
 default="${default:-main}"
 start="$(git rev-parse --abbrev-ref HEAD)"
 
-# 2. Releases come off a feature branch, so every tag points at code a PR merged
+# 1. Releases come off a feature branch, so every tag points at code a PR merged
 #    and CI checked. '$default' is protected on both, and a tag cut from a local
 #    '$default' would sidestep them — even a synced one, since the checkout can
 #    hold commits that reached it by some other route.
@@ -56,7 +50,7 @@ fi
 # Always end back on the branch we started on — never park on the default branch.
 trap 'git checkout --quiet "$start" 2>/dev/null || true' EXIT
 
-# 3. Push the branch, open a PR if there isn't one, and merge it into the default
+# 2. Push the branch, open a PR if there isn't one, and merge it into the default
 #    branch — without switching this checkout — so the tag comes off the merged tip.
 if ! command -v gh >/dev/null; then
 	echo "on '$start' — releasing needs it merged to '$default'. Install gh (https://cli.github.com) or merge manually, then re-run." >&2
@@ -140,7 +134,7 @@ else
 	git rebase "origin/$default"
 fi
 
-# 4. Take the version the ranke-go this tree mirrors fixes, tag the merged tip, push
+# 3. Take the version the ranke-go this tree mirrors fixes, tag the merged tip, push
 #    the tag. Derived rather than chosen: scripts/next-version.sh states the rule, and
 #    the tags it reads are the ones fetched at the top of this script.
 next="$(./scripts/next-version.sh)"
@@ -190,7 +184,7 @@ else
 	done
 fi
 
-# 5. Wait for the release workflow — freshly triggered, or just rerun — so a failed
+# 4. Wait for the release workflow — freshly triggered, or just rerun — so a failed
 #    build or publish surfaces here instead of silently.
 echo "waiting for the release workflow…"
 if [ -z "${run_id:-}" ] || [ "$run_id" = "null" ]; then
