@@ -5,7 +5,7 @@
 .PHONY: all install test typecheck build clean verify check release check-clean-tree fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
 	spec ranke-go-check rule-citations next-version next-version-check \
-	major minor patch breaking feature fix
+	major minor patch breaking feature fix upgrade
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -13,6 +13,15 @@
 RANKE_GRAPH_REPO ?= https://github.com/rankegraph/ranke-graph
 RANKE_GRAPH_REF  ?= main
 PAPERS_DIR       := docs/papers
+
+# release-cycle.sh lives in ranke-graph and serves every consumer repo, so the git
+# mechanics of a release (branch resolution, the merge-then-tag dance, the wait for
+# CI) are written once, there. Cached under bin/ (gitignored), like brokkr elsewhere
+# in this ecosystem. What differs here — the version is derived, not chosen, and
+# this repo releases from a feature branch only — is scripts/release-next-version.sh
+# and scripts/release-feature-branch-only (see that script's own header).
+RELEASE_CYCLER     := bin/release-cycle.sh
+RELEASE_CYCLER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$(RANKE_GRAPH_REF)/scripts/release-cycle.sh
 
 all: typecheck test build
 
@@ -154,12 +163,25 @@ next-version-check:
 check-clean-tree:
 	@[ -z "$$(git status --porcelain)" ] || { echo "working tree is dirty — commit or stash before releasing" >&2; exit 1; }
 
-release: check-clean-tree verify
-	@./scripts/release.sh $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
+release: check-clean-tree verify $(RELEASE_CYCLER)
+	@$(RELEASE_CYCLER)
 
-# Absorb a bump word so `make release patch` reaches release.sh, which refuses it by name
-# rather than leaving make to report a missing target. Someone passing one believes they
-# chose something, and should be told they did not.
+$(RELEASE_CYCLER): ## Cache release-cycle.sh from ranke-graph (bin/ is gitignored — infra, never vendored)
+	@mkdir -p $(dir $(RELEASE_CYCLER))
+	@curl -fsSL $(RELEASE_CYCLER_URL) -o $(RELEASE_CYCLER)
+	@chmod +x $(RELEASE_CYCLER)
+
+# $(RELEASE_CYCLER) is a file target with no prerequisite, so once cached it is
+# never re-fetched on its own — a stale copy (missing a ranke-graph fix) would sit
+# there forever otherwise. upgrade is the one command that already means "bring
+# everything to latest", so refreshing it here is what makes that true.
+upgrade: ## Refresh the cached release-cycle.sh from ranke-graph
+	@rm -f $(RELEASE_CYCLER)
+	@$(MAKE) $(RELEASE_CYCLER)
+
+# Absorb a bump word so `make release patch` reaches release-cycle.sh, which refuses
+# it by name rather than leaving make to report a missing target. Someone passing one
+# believes they chose something, and should be told they did not.
 major minor patch breaking feature fix:
 	@:
 

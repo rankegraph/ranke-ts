@@ -1,0 +1,3 @@
+Existence checked only by scripts/release-cycle.sh — releasing from the
+default branch itself is refused here, since the tag must land on code a PR
+merged and CI checked. See that script's own header.
