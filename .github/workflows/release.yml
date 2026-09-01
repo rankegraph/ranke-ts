@@ -22,6 +22,10 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      # Trusted Publishing (below) needs npm >= 11.5.1; Node 22's bundled npm
+      # predates that, so it's taken from npm itself rather than Node's pin.
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
       # Build, not verify. The tag is cut from a commit the pull request already
@@ -36,11 +40,13 @@ jobs:
       - name: Set version from the tag
         run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
 
-      # A scoped package defaults to restricted, hence --access public.
+      # No token: npmjs.com's Trusted Publisher for this repo+workflow exchanges the
+      # `id-token: write` OIDC token above for a publish credential minted just for
+      # this run, which is what makes NPM_TOKEN unnecessary — nothing here can go
+      # stale between releases the way a stored secret did. A scoped package
+      # defaults to restricted, hence --access public.
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
