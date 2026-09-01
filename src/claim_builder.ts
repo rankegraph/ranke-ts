@@ -35,6 +35,7 @@ import {
   validFieldChars,
   validSubtype,
 } from './field_taxonomy.ts'
+import { validateDated } from './edtf.ts'
 import { splitType } from './filter.ts'
 import { type Id, hashContent, idFromBytes, parseId } from './id.ts'
 import {
@@ -113,6 +114,8 @@ export interface ClaimInput {
   /** RFC 3339; the encoder needs fixed-width nanoseconds, so a Date is normalised. */
   readonly createdAt?: string | Date
   readonly height?: number
+  /** EDTF Level 1, or an RFC 3339 instant (`V-DATED`); absent leaves the node with none. */
+  readonly dated?: string
   readonly fields?: Readonly<Record<string, string>>
   readonly edges?: readonly EdgeInput[]
   /** diffOf makes this claim a diff over the predecessor it names. */
@@ -204,6 +207,7 @@ export function newClaim(input: ClaimInput): { claim: Claim; bytes: Uint8Array; 
   }
   checkContent(input.content)
   checkFields(input.fields)
+  checkDated(input.dated)
   const height = input.height ?? 0
   if (!representableCount(height)) {
     throw new RankeBuildError(`height ${height} is not a generation a record carries`)
@@ -234,6 +238,7 @@ export function newClaim(input: ClaimInput): { claim: Claim; bytes: Uint8Array; 
     typeSub,
     createdAt: normalizeCreatedAt(input.createdAt),
     height,
+    ...(input.dated === undefined || input.dated === '' ? {} : { dated: input.dated }),
     ...(input.fields === undefined ? {} : { fields: input.fields }),
     ...(input.content === undefined ? {} : { content: input.content }),
     ...(edges.length === 0 ? {} : { edges: edges.map((e) => e.record) }),
@@ -459,6 +464,15 @@ function checkFields(fields: Readonly<Record<string, string>> | undefined): void
       throw new RankeBuildError(`field ${name} carries an unpaired surrogate`)
     }
   }
+}
+
+// checkDated holds `dated` to `V-DATED`: absence is no violation, since it is optional, so
+// only a present value that will not parse is refused.
+function checkDated(dated: string | undefined): void {
+  if (dated === undefined || dated === '' || validateDated(dated)) return
+  throw new RankeBuildError(
+    `dated is neither an RFC 3339 timestamp nor a valid EDTF Level 1 value (\`V-DATED\`), got ${JSON.stringify(dated)}`,
+  )
 }
 
 /**

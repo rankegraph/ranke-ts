@@ -33,6 +33,7 @@ const NODE_OWN = new Map([
   [9, 'created_at'],
   [10, 'edges'],
   [11, 'height'],
+  [14, 'dated'],
 ])
 const EDGE_OWN = new Map([
   [12, 'reference'],
@@ -65,12 +66,13 @@ test('the shared slots agree across the two records', () => {
 // and a later implementation may add one.
 test('an unassigned key has no name', () => {
   for (const kind of ['node', 'edge'] as RecordKind[]) {
-    for (const key of [0, 14, 23, 24, 99]) {
+    for (const key of [0, 23, 24, 99]) {
       assert.equal(recordKeyName(kind, key), undefined, `${kind} key ${key}`)
     }
   }
   assert.equal(recordKeyName('node', 12), undefined, 'reference is an edge slot')
   assert.equal(recordKeyName('edge', 9), undefined, 'created_at is a node slot')
+  assert.equal(recordKeyName('edge', 14), undefined, 'dated is a node slot')
 })
 
 // keysOf reads the numeric keys of a CBOR map, which is what a reader faces.

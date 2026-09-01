@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/flocko-motion/ranke-graph/refs/heads/main/spec/rql.schema.json",
+  "$id": "https://raw.githubusercontent.com/rankegraph/ranke-graph/refs/heads/main/spec/rql.schema.json",
   "title": "RankeQL (RQL)",
-  "description": "The query type of RankeQL (RQL). A projection of the RankeQL chapter of the Ranke normative specification: the spec is the reading source, this document checks the shapes it names. Where the two disagree, one is a defect — decide which and fix it. The R-Q… ids below cite that chapter, those ids being stable handles by its own convention. Published with every ranke-graph release at https://github.com/flocko-motion/ranke-graph/releases/latest/download/rql.schema.json. Three classes of rule lie outside a JSON Schema and belong to the implementation: a step's min against its max (R-QSTEPS), head and claim resolving inside the closure (R-QHEAD, R-QANCHOR), and the framing of an id's payload.",
+  "description": "The query type of RankeQL (RQL). A projection of the RankeQL chapter of the Ranke normative specification: the spec is the reading source, this document checks the shapes it names. Where the two disagree, one is a defect — decide which and fix it. The R-Q… ids below cite that chapter, those ids being stable handles by its own convention. Published with every ranke-graph release at https://github.com/rankegraph/ranke-graph/releases/latest/download/rql.schema.json. Three classes of rule lie outside a JSON Schema and belong to the implementation: a step's min against its max (R-QSTEPS), head and claim resolving inside the closure (R-QHEAD, R-QANCHOR), and the framing of an id's payload.",
 
   "$ref": "#/$defs/Query",
 

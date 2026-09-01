@@ -19,7 +19,7 @@ export type RecordKind = 'node' | 'edge'
 // renumbered — @tbl:keys is untouched, so every number below means what it always did.
 
 // Keys 1 to 8 are the slots a node and an edge share, so one number means one thing in
-// either record. A node then takes 9 to 11 and an edge 12 to 13 (`V-SER`).
+// either record. A node then takes 9 to 11 and 14, an edge 12 to 13 (`V-SER`).
 export const RecordKeyTypeClass = 1
 export const RecordKeyTypeSubtype = 2
 export const RecordKeyEncodingClass = 3
@@ -33,6 +33,8 @@ export const RecordKeyFields = 8
 export const NodeKeyCreatedAt = 9
 export const NodeKeyEdges = 10
 export const NodeKeyHeight = 11
+/** `dated` (`V-DATED`), assigned after the first three node-only slots were taken. */
+export const NodeKeyDated = 14
 
 /** The slots only an edge carries. */
 export const EdgeKeyReference = 12
@@ -61,6 +63,7 @@ export const NodeRecordKeys: ReadonlyMap<number, string> = new Map([
   [NodeKeyCreatedAt, 'created_at'],
   [NodeKeyEdges, 'edges'],
   [NodeKeyHeight, 'height'],
+  [NodeKeyDated, 'dated'],
 ])
 
 /** EdgeRecordKeys is the same for an edge record, whose own slots are 12 and 13. */

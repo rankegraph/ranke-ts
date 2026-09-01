@@ -34,7 +34,7 @@ test('the fixtures come from a released ranke-go', () => {
     'fields' in src,
     `ranke-go ${fx.provenance.rankeGo}'s JSON projection predates the edge-slot fix ` +
       '(fields flattened, edges reduced to {type, reference}). Release ranke-go, then ' +
-      'cd tools && go get github.com/flocko-motion/ranke-go@vX.Y.Z && scripts/fixtures.sh',
+      'cd tools && go get github.com/rankegraph/ranke-go@vX.Y.Z && scripts/fixtures.sh',
   )
 })
 

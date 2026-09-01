@@ -21,10 +21,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	ranke "github.com/flocko-motion/ranke-go"
+	ranke "github.com/rankegraph/ranke-go"
 )
 
-const rankeGoModule = "github.com/flocko-motion/ranke-go"
+const rankeGoModule = "github.com/rankegraph/ranke-go"
 
 // stream is one framed sequence: what a reader must make of it, and its bytes.
 type stream struct {

@@ -10,7 +10,7 @@
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
 # never committed — always fetched, never vendored.
-RANKE_GRAPH_REPO ?= https://github.com/flocko-motion/ranke-graph
+RANKE_GRAPH_REPO ?= https://github.com/rankegraph/ranke-graph
 RANKE_GRAPH_REF  ?= main
 PAPERS_DIR       := docs/papers
 

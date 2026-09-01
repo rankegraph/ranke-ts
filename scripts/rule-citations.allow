@@ -54,6 +54,7 @@ R-QEVAL        another layer's: the evaluation order is the engine's
 R-QFORM        another layer's: resolving a diff chain is the server's; only the axis is sent
 R-QFRONTIER    another layer's: frontier membership is decided by the walk
 R-QSORT        another layer's: the sort runs where the result set does
+R-QTEMPORAL    another layer's: compare: temporal's sort runs where the result set does, same as R-QSORT
 R-QLIMIT       another layer's: bounding a read is the engine's; the duration grammar is the schema's
 
 # Translation to Cypher — the graph backend's own chapter.

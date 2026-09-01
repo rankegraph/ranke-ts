@@ -1,5 +1,5 @@
 {
-  "name": "@flocko-motion/ranke",
+  "name": "@rankegraph/ranke",
   "version": "0.0.0",
   "description": "TypeScript reader for the Ranke-Graph ADT: decode claims, build RankeQL queries.",
   "license": "Apache-2.0",
@@ -29,6 +29,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flocko-motion/ranke-ts.git"
+    "url": "git+https://github.com/rankegraph/ranke-ts.git"
   }
 }

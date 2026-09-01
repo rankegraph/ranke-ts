@@ -11,7 +11,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-URL=${RQL_SCHEMA_URL:-https://github.com/flocko-motion/ranke-graph/releases/latest/download/rql.schema.json}
+URL=${RQL_SCHEMA_URL:-https://github.com/rankegraph/ranke-graph/releases/latest/download/rql.schema.json}
 DEST=schema/rql.schema.json
 
 mkdir -p schema
