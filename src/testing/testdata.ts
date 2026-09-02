@@ -19,15 +19,28 @@ import { join } from 'node:path'
 /** MANIFEST is the manifest's filename inside a set. */
 export const MANIFEST = 'manifest.json'
 
-// Reason codes, so a test asserts the outcome it expected rather than any refusal.
+// Reason codes, so a test asserts the outcome it expected rather than any refusal. The set
+// is ranke-go's internal/vectors/manifest.go, which is what mints them.
 export const ReasonOK = 'ok'
 export const ReasonIDMismatch = 'id_mismatch'
 export const ReasonWrongMessage = 'wrong_message'
 export const ReasonMalformedID = 'malformed_id'
-export const ReasonIdentitySign = 'identity_sign_mismatch'
+export const ReasonNotEnveloped = 'not_enveloped'
 export const ReasonNoContributor = 'unresolvable_contributor'
 export const ReasonHeightWrong = 'height_wrong'
 export const ReasonContentMismatch = 'content_hash_mismatch'
+export const ReasonTimestampForm = 'timestamp_form'
+export const ReasonBothContent = 'content_both_slots'
+export const ReasonEdgeOrder = 'edge_order'
+export const ReasonDatedForm = 'dated_form'
+/** The first branch table's fixed height, read off the record alone. */
+export const ReasonFirstTableHeight = 'first_table_height'
+// The bookmark codes, one per rule a 𝒰_hist record can break.
+export const ReasonBookmarkForm = 'bookmark_form'
+export const ReasonBookmarkSignature = 'bookmark_signature'
+export const ReasonBookmarkSlot = 'bookmark_slot'
+export const ReasonBookmarkReference = 'bookmark_reference'
+export const ReasonBookmarkGap = 'bookmark_gap'
 
 /**
  * ClaimCase is one claim record under the id it is offered as. The id is not part of
@@ -39,6 +52,25 @@ export interface ClaimCase {
   readonly verify: boolean
   readonly reason: string
   readonly why: string
+  /** The rules this record breaks, absent for a case that must verify. */
+  readonly violates?: readonly string[]
+}
+
+/**
+ * BookmarkCase is one 𝒰_hist record under the id_seq(i, s) slot it is offered at
+ * (`V-BMENV`). A case naming a list belongs to that whole list rather than standing alone:
+ * the list is assembled from every case sharing the name, opened at the one marked open, and
+ * judged together — which is the only register a list's contiguity has.
+ */
+export interface BookmarkCase {
+  readonly file: string
+  readonly slot: string
+  readonly verify: boolean
+  readonly reason: string
+  readonly why: string
+  readonly list?: string
+  readonly open?: boolean
+  readonly violates?: readonly string[]
 }
 
 /** ContentCase is one content blob under the hash it is offered as. */
@@ -48,6 +80,7 @@ export interface ContentCase {
   readonly verify: boolean
   readonly reason: string
   readonly why: string
+  readonly violates?: readonly string[]
 }
 
 export interface Provenance {
@@ -62,6 +95,7 @@ export interface Manifest {
   readonly provenance: Provenance
   readonly claims: readonly ClaimCase[]
   readonly content: readonly ContentCase[]
+  readonly bookmarks: readonly BookmarkCase[]
 }
 
 /** ArtifactSet is a resolved set: where it lives, and what it expects. */
@@ -101,8 +135,18 @@ export async function resolveArtifacts(): Promise<ArtifactSet> {
   return { root: papersSet, manifest: loadManifest(papersSet), origin: `papers at ${papersSet}` }
 }
 
+// loadManifest reads a set's manifest and demands a list for every keyspace it describes.
+// ranke-go leaves `bookmarks` omitempty, so a set predating them parses as a manifest with
+// none — and a suite reading that as "no bookmark cases to run" would report conformance it
+// never checked. An absent keyspace is a failure here, the same way an absent set is.
 function loadManifest(dir: string): Manifest {
-  return JSON.parse(readFileSync(join(dir, MANIFEST), 'utf8')) as Manifest
+  const m = JSON.parse(readFileSync(join(dir, MANIFEST), 'utf8')) as Manifest
+  for (const keyspace of ['claims', 'content', 'bookmarks'] as const) {
+    if (!Array.isArray(m[keyspace])) {
+      throw new Error(`${join(dir, MANIFEST)} names no ${keyspace} — the set is older than the suite`)
+    }
+  }
+  return m
 }
 
 /** readArtifact returns one file's bytes, named as the manifest names it. */

@@ -42,6 +42,13 @@ Reading claims a server served, building claims, and building the queries that a
 for them. No key material, no storage, no diff materialisation, no query
 *execution* — see README.md for why each is out.
 
+A bookmark is read here too: without the latest head id there is nothing to close over,
+so `bookmark.ts` mirrors the READ half of `bookmark.go` — `idSeq` (`V-IDSEQ`), the record
+(`V-BMENV`), and the slot it must key (`V-BMSLOT`). Writing `U_hist` is the Sequencer's
+alone, so `SignBookmark` and the minted seed have no counterpart, and `bookmarks.go`'s
+list needs the store. What resolves an id — the kid's claim, the head `k` — runs in
+`vectors_test.ts` against the closure it assembles, as a claim's own references do.
+
 Signing is injected: a `Signer` turns the envelope's signing input — the
 `Sig_structure` of RFC 9052 §4.4, which this library builds — into a signature, so an
 application's key never enters this library and a caller needs no COSE of its own.
