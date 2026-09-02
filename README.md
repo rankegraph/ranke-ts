@@ -16,6 +16,8 @@ file and name for name, so the two can be read side by side.
 - read a result run as it streams — cbor-seq (RFC 8742) and json-seq (RFC 7464) —
   whichever `output.detail` asked for: claims, ids, or routes of ids
 - build claims, encoding them to the bytes ranke-go encodes them to
+- read a bookmark, the record locating an archive's moving head, and address the
+  `id_seq(i, s)` slot it is filed under
 - build, check and encode a RankeQL query
 - the closed type vocabularies and the wire alias tables
 - ids: the SHA2-256 multihash framing and the multibase string form
@@ -200,6 +202,42 @@ being metadata rather than the content a cap applies to. Both encodings resolve 
 the same way — reading it as `none` would collapse "too large, fetch on selection"
 into "this claim has nothing", which is the same answer to two different questions.
 
+## Finding the head
+
+An archive's head id `k` moves with every contribution, and `𝒰` resolves only
+backwards: without the latest `k` there is nothing to close over, and a store that
+retrieves by key offers no enumeration to search. A **bookmark** is the locator — a
+signed record of an index `i`, a seed `s`, and the head id `k` it records — which
+`𝒰_hist` holds under `id_seq(i, s)`:
+
+```ts
+import { bookmarkAt, idSeq } from '@rankegraph/ranke'
+
+const slot = idSeq(0, seed)
+const bm = bookmarkAt(slot, await fetchSlot(slot))
+
+bm.index   // 0 — its position in the list
+bm.seed    // the seed its list is keyed on
+bm.head    // "bciq…" — the branch-table claim to close over
+bm.signer  // the contributor whose key signed it
+```
+
+`id_seq(i, s)` is `H(S([i, s]))`, a CBOR array where a claim is always a map, so no
+claim's bytes can key a bookmark's slot and the two keyspaces need no further
+convention to keep apart (`V-IDSEQ`). A bookmark is therefore the one record here
+that is not addressed by a hash of itself.
+
+Every entry carries the seed, so any one bookmark opens the whole list: step `i` up
+by doubling until a slot misses, then binary-search between the last hit and the
+first miss. The list is gapless, which is what makes that `O(log n)`.
+
+`bookmarkAt` decides the two rules a single fetch settles — the record's shape
+(`V-BMENV`), and that its own `(i, s)` keys the slot it arrived at (`V-BMSLOT`),
+where a mismatch is absence at that slot rather than damage. The remaining three
+need more than the record: the signature needs the contributor's key, `k` needs a
+`𝒰` read, and contiguity needs the store. Writing `𝒰_hist` is the Sequencer's
+alone, so nothing here mints or signs a bookmark.
+
 ## Record keys
 
 Inside its envelope, a claim serializes as a CBOR map under the numeric keys `V-SER`
@@ -301,7 +339,7 @@ an entry that differs from ranke-go's gives one claim two encodings.
 **Reference data is generated, never transcribed.** ranke-go is the reference
 implementation, so its output is the specification rather than a sample of it.
 `tools/` holds Go programs that emit it — claims in both encodings, Go's
-`path.Match` over 476 pattern/name pairs, and ranke-go's verdict on 43 queries.
+`path.Match` over 476 pattern/name pairs, and ranke-go's verdict on 72 queries.
 Each records the ranke-go release it came from, and the suite refuses a set that
 names no release. A hand-copied fixture is one nibble from testing the wrong
 thing, which is how this rule was learnt.
@@ -319,6 +357,12 @@ resolves nowhere, a claim stored without its envelope, edges stored out of order
 each content blob against the hash it is filed under. Those that turn on a signature are
 named individually in the test, so a case becoming undecidable for a new reason fails
 rather than passes quietly. Set `RANKE_TESTDATA_DIR` to work offline.
+
+The set names three keyspaces, and the loader demands a list for each: `𝒰`'s claims,
+their external content, and `𝒰_hist`'s bookmarks. ranke-go leaves the last one
+`omitempty`, so a set cut before bookmarks existed would otherwise parse as a set with
+no bookmark cases to run — and reporting conformance nothing checked is the failure this
+whole file guards against.
 
 ## Development
 
@@ -392,27 +436,29 @@ The tag is therefore the one place a version lives, as in ranke-go and
 ranke-graph, where a module version is its tag. JSON takes no comments, so this
 note stands in for one.
 
-**The version follows ranke-go's.** The major and minor are always the ranke-go this
-tree mirrors, and only the patch drifts: `ranke-ts 0.24.x` implements `ranke-go 0.24.x`,
-whatever `x` is. The patch starts at ranke-go's and steps up to the first free one, so
-consecutive releases against one ranke-go walk it, and a minor or major move upstream
-carries straight across.
-
-| ranke-go | last ranke-ts | next ranke-ts |
-|---|---|---|
-| 0.24.3 | 0.24.3 | 0.24.4 |
-| 0.24.4 | 0.24.4 | 0.24.5 |
-| 0.25.0 | 0.24.5 | 0.25.0 |
-
-So `make release` takes no bump word: for a library whose job is mirroring another,
-what a version can usefully say is which reference it tracks — a fact — rather than
-whether a change breaks anything, which was our own reading each time. The trade is
-that the number no longer signals compatibility on its own; the release notes do.
+**The version is this library's own.** It says what a semantic version says: whether
+the change breaks a caller, adds to what one can do, or fixes something. So a release
+takes a bump word, and `release-cycle.sh` applies it to the latest tag:
 
 ```sh
-make version       # the latest release tag, which is the version this tree answers to
-make next-version  # the version the next release would take
+make release patch    # or fix
+make release minor    # or feature
+make release major    # or breaking
+make version          # the latest release tag, which is the version this tree answers to
 ```
+
+The number was derived from the ranke-go in `tools/go.mod` until 0.26.1 — major and
+minor taken from the reference, only the patch drifting — so that `ranke-ts 0.24.x`
+read as "implements `ranke-go 0.24.x`". That made the version a fact rather than a
+judgement, at the price of the one thing a caller reads a version for: an
+`0.24.3`→`0.25.0` step meant the reference moved, and said nothing about whether this
+library's own surface did. Which ranke-go a release mirrors is recorded where it is
+checkable instead — `tools/go.mod`, and the provenance stamped into every generated
+fixture — and the version is free to describe this package.
+
+Mirroring ranke-go is unchanged by this: `ranke-go-check` still holds the pin to the
+latest release and the fixtures to the pin, and `verify` still fails when the reference
+moves and this code has not.
 
 ## Licence
 

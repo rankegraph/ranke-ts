@@ -1,11 +1,14 @@
 # Rules the spec declares that no comment in this library cites — the ratchet half of
 # scripts/rule-citations.sh. One rule per line: the id, then a reason.
 #
-# THE LIST MAY ONLY SHRINK. Cite a rule and its line goes; the script fails on a listed
-# rule that has since been cited, so the list cannot rot into a permanent exemption that
-# silences the "uncited and unlisted" failure. It started at 45 entries; citing the rules
-# this library actually enforces took 16 of them in the same change, which is the
-# mechanism working.
+# THE LIST MAY ONLY SHRINK against the rules it already holds. Cite a rule and its line
+# goes; the script fails on a listed rule that has since been cited, so the list cannot rot
+# into a permanent exemption that silences the "uncited and unlisted" failure. It started at
+# 45 entries; citing the rules this library actually enforces took 16 of them in the same
+# change, which is the mechanism working.
+#
+# A rule the spec DECLARES for the first time is the one thing that adds a line: it must be
+# cited or listed, and the reasons below are what say which. Bookmarks arrived that way.
 #
 # What a reason says, and it says one of these three:
 #
@@ -30,6 +33,7 @@ R-AGRANT       another layer's: grants and accounts are the server's configurati
 R-ABRANCH      another layer's: per-branch rights are checked before a read is served
 R-ATABLE       another layer's: rights over $branches are the server's to check
 R-AUNIVERSE    another layer's: the privileged $universe read is the server's to grant
+R-ABOOKMARK    another layer's: writing $U_hist$ is the Sequencer's alone, under no grant
 
 # Contribution — the six-step procedure, all of it a Sequencer's. This library builds a
 # claim and stops; what happens to it afterwards is RankeDB's.
@@ -44,9 +48,17 @@ R-C5PERSIST    another layer's: durable storage before a merge
 R-C6MERGE      another layer's: the Sequencer contributes the branch table
 R-C6REQUEST    another layer's: a request becomes its limiting claim at merge
 R-C6SIGN       another layer's: the Sequencer's own identity on the claims it creates
+R-C7BOOKMARK   another layer's: the bookmark recording the advance is written at step 7
 
 # Deletion — the requested form, which the Sequencer documents and carries out.
 R-DREQUEST     another layer's: the contribution/delete claim is the Sequencer's to create
+
+# Bookmarks — this library reads one $U_hist$ record, which is what a fetch has. The list
+# it belongs to is the store's, and the key it publishes a bookmark's signature under is a
+# contributor's.
+V-BMSIG        another layer's: a signature is checked where the keys are, as V-SIG is
+V-BMGAPLESS    another layer's: a list's contiguity is a property of the store holding it
+R-BMPREFIX     another layer's: separating the two keyspaces is the blob store's
 
 # RQL — this library sends a query and reads the results. Which claims come back, and in
 # what order, is the engine's.
@@ -54,7 +66,6 @@ R-QEVAL        another layer's: the evaluation order is the engine's
 R-QFORM        another layer's: resolving a diff chain is the server's; only the axis is sent
 R-QFRONTIER    another layer's: frontier membership is decided by the walk
 R-QSORT        another layer's: the sort runs where the result set does
-R-QTEMPORAL    another layer's: compare: temporal's sort runs where the result set does, same as R-QSORT
 R-QLIMIT       another layer's: bounding a read is the engine's; the duration grammar is the schema's
 
 # Translation to Cypher — the graph backend's own chapter.

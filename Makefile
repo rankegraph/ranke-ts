@@ -2,10 +2,10 @@
 #
 # Thin wrapper over the npm scripts, so the targets match ranke-go's.
 
-.PHONY: all install test typecheck build clean verify check release fixtures \
+.PHONY: all install test typecheck build clean verify check release check-clean-tree fixtures \
 	bench version generate pull-rql-schema check-generated docs docs-clean \
-	spec ranke-go-check rule-citations next-version next-version-check \
-	major minor patch breaking feature fix
+	spec ranke-go-check rule-citations check-release-bump \
+	major minor patch breaking feature fix upgrade
 
 # Foundational papers live in the ranke-graph repo. `make docs` pulls a fresh
 # copy into docs/papers/ for local reference; the directory is gitignored and
@@ -13,6 +13,14 @@
 RANKE_GRAPH_REPO ?= https://github.com/rankegraph/ranke-graph
 RANKE_GRAPH_REF  ?= main
 PAPERS_DIR       := docs/papers
+
+# release-cycle.sh lives in ranke-graph and serves every consumer repo, so the git
+# mechanics of a release (branch resolution, the merge-then-tag dance, the wait for
+# CI) are written once, there. Cached under bin/ (gitignored), like brokkr elsewhere
+# in this ecosystem. What differs here — this repo releases from a feature branch
+# only — is scripts/release-feature-branch-only (see that script's own header).
+RELEASE_CYCLER     := bin/release-cycle.sh
+RELEASE_CYCLER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$(RANKE_GRAPH_REF)/scripts/release-cycle.sh
 
 all: typecheck test build
 
@@ -115,7 +123,7 @@ ranke-go-check:
 # check-generated is here because it was documented as a release gate and run by
 # nothing — not verify, not release, not CI. A guarantee no target enforces is a
 # comment. It WRITES src/query.ts; see its own note above.
-verify: spec ranke-go-check next-version-check typecheck test build check-generated rule-citations
+verify: spec ranke-go-check typecheck test build check-generated rule-citations
 
 # The conventional name for the gate above — an alias, so both spellings run the
 # same checks and neither can drift from the other.
@@ -123,7 +131,7 @@ check: verify
 
 # The version, which is the latest release tag: package.json carries 0.0.0 in the tree
 # and the release workflow stamps the tag's number in just before publishing. `--match`
-# holds the answer to release tags, as scripts/release.sh does when it picks the tag to
+# holds the answer to release tags, as release-cycle.sh does when it picks the tag to
 # bump from — a prerelease or a stray tag is not the version this tree answers to.
 version:
 	@git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || { \
@@ -131,30 +139,44 @@ version:
 		exit 1; \
 	}
 
-# The version the next release takes: ranke-go's, or the first free patch above it. The
-# major and minor are always ranke-go's, so the two read side by side.
-next-version:
-	@./scripts/next-version.sh
-
-# The rule above, over its worked examples and the invariant they instance. In `verify`
-# because release machinery that computes the wrong version mints a wrong release, and
-# nothing downstream would question the number it was handed.
-next-version-check:
-	@./scripts/next-version-test.sh
-
 # Cut a release: verify → rebase onto the default branch → merge via PR → tag the
 # merged tip → push the tag → watch the release workflow, failing here if it fails.
 # Run it from a feature branch; from the default branch it refuses, since the tag
 # must land on code a PR merged and CI checked.
 #
-# Usage: make release. There is no bump word to pass — the version follows the ranke-go
-# this tree mirrors, so nothing about it is a judgement to make at release time.
-release: verify
-	@./scripts/release.sh $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
+# Usage: make release <major|minor|patch> (aliases: breaking|feature|fix). The bump is
+# a judgement about this library's own surface, so it is stated at release time;
+# release-cycle.sh applies it to the latest tag.
+# check-clean-tree first, ahead of verify: a dirty tree is a free, instant check,
+# and verify is not — failing on it should not cost a build first.
+check-clean-tree:
+	@[ -z "$$(git status --porcelain)" ] || { echo "working tree is dirty — commit or stash before releasing" >&2; exit 1; }
 
-# Absorb a bump word so `make release patch` reaches release.sh, which refuses it by name
-# rather than leaving make to report a missing target. Someone passing one believes they
-# chose something, and should be told they did not.
+# Same reasoning as check-clean-tree: a missing or misspelled bump word is free to
+# check, and verify is not — release-cycle.sh validates it too, but only after a whole
+# gate has run.
+check-release-bump:
+	@[ -n "$(filter major minor patch breaking feature fix,$(MAKECMDGOALS))" ] || \
+		{ echo "usage: make release <major|breaking | minor|feature | patch|fix>" >&2; exit 1; }
+
+release: check-clean-tree check-release-bump verify $(RELEASE_CYCLER)
+	@$(RELEASE_CYCLER) $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
+
+$(RELEASE_CYCLER): ## Cache release-cycle.sh from ranke-graph (bin/ is gitignored — infra, never vendored)
+	@mkdir -p $(dir $(RELEASE_CYCLER))
+	@curl -fsSL $(RELEASE_CYCLER_URL) -o $(RELEASE_CYCLER)
+	@chmod +x $(RELEASE_CYCLER)
+
+# $(RELEASE_CYCLER) is a file target with no prerequisite, so once cached it is
+# never re-fetched on its own — a stale copy (missing a ranke-graph fix) would sit
+# there forever otherwise. upgrade is the one command that already means "bring
+# everything to latest", so refreshing it here is what makes that true.
+upgrade: ## Refresh the cached release-cycle.sh from ranke-graph
+	@rm -f $(RELEASE_CYCLER)
+	@$(MAKE) $(RELEASE_CYCLER)
+
+# Absorb the positional bump word in `make release <bump>` so it isn't treated
+# as a missing target.
 major minor patch breaking feature fix:
 	@:
 

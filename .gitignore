@@ -1,6 +1,9 @@
 dist/
 node_modules/
 
+# release-cycle.sh, fetched from ranke-graph — infra, never vendored.
+bin/
+
 # Foundational papers pulled fresh from ranke-graph by `make docs` —
 # fetched, never committed.
 docs/papers/

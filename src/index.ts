@@ -4,6 +4,7 @@
 // limits:  declares nothing of its own; ranke-go has no counterpart, a Go package
 // needing none
 
+export * from './bookmark.ts'
 export * from './claim.ts'
 export * from './claim_builder.ts'
 export * from './codec.ts'
