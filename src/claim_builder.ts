@@ -49,7 +49,7 @@ import {
   NodeSubtypeExpiry,
   validNodeClass,
 } from './node_taxonomy.ts'
-import { validRFC3339Nano } from './time_fields.ts'
+import { formatTimestamp, validRFC3339Nano } from './time_fields.ts'
 import { compareBytes } from './internal/cbor.ts'
 
 /** RankeBuildError reports a claim that cannot be built. */
@@ -489,9 +489,7 @@ export function normalizeCreatedAt(at: string | Date | undefined): string {
     }
     return at
   }
-  const d = at ?? new Date()
-  const ms = d.toISOString() // ...THH:MM:SS.mmmZ
-  return `${ms.slice(0, -1)}000000Z`
+  return formatTimestamp(at ?? new Date())
 }
 
 /** heightOf is 1 + the highest height among refs, and 0 with none (§4.1, `V-HEIGHT`). */

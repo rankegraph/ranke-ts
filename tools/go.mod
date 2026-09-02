@@ -10,7 +10,7 @@ module github.com/rankegraph/ranke-ts/tools
 
 go 1.27.1
 
-require github.com/rankegraph/ranke-go v0.27.0
+require github.com/rankegraph/ranke-go v0.28.0
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect

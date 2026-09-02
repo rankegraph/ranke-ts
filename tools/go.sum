@@ -36,6 +36,8 @@ github.com/rankegraph/ranke-go v0.26.0 h1:VyM113c5n+wNeNZ4fDhAPMppGnOX8lBwI+nLX1
 github.com/rankegraph/ranke-go v0.26.0/go.mod h1:d1nlsmS35RkN/Z/sic/dC0maimAKscaBrgKWfRBPdFg=
 github.com/rankegraph/ranke-go v0.27.0 h1:L5QxM53ECrEZ9dL0dEcgKHpgcfPoRgkeNDbutQEBmuo=
 github.com/rankegraph/ranke-go v0.27.0/go.mod h1:qXRVqMCeFfgnHIYrYyRn/FsRszjy0GvwxVoMMVKLY8c=
+github.com/rankegraph/ranke-go v0.28.0 h1:W98gEqstv/6565JIcCOkl5znXe5+/FU11H33JFbDLpw=
+github.com/rankegraph/ranke-go v0.28.0/go.mod h1:qXRVqMCeFfgnHIYrYyRn/FsRszjy0GvwxVoMMVKLY8c=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
 github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=

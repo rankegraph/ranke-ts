@@ -9,6 +9,8 @@
 // where a read enforces it — catching it here saves the round trip, which is what
 // a client-side validator is for.
 
+import { validateDated } from './edtf.ts'
+import { FieldDeleteBy, FieldPubkeyExpiresAfter, FieldPubkeyValidFrom } from './field_taxonomy.ts'
 import type {
   Comparison,
   Execution,
@@ -20,6 +22,7 @@ import type {
   Select,
   Where,
 } from './query.ts'
+import { validRFC3339Nano } from './time_fields.ts'
 
 /**
  * QueryErrorCode names the rule a query broke, matching ranke-go's sentinel of the
@@ -31,6 +34,7 @@ export type QueryErrorCode =
   | 'ErrQueryScanShape'
   | 'ErrQueryWhereForm'
   | 'ErrQueryComparisonForm'
+  | 'ErrQueryTimeOperand'
   | 'ErrQueryHops'
   | 'ErrQueryOrderField'
   | 'ErrQueryLayerName'
@@ -286,7 +290,7 @@ function validateWhere(w: Where, field: string): void {
       )
     }
     checkString(`${field}.field`, node.field)
-    validateComparison(node.test as Comparison, `${field}.test`)
+    validateComparison(node.test as Comparison, `${field}.test`, node.field as string)
     return
   }
   if (node.and !== undefined) {
@@ -305,23 +309,56 @@ function validateWhere(w: Where, field: string): void {
   }
 }
 
-// validateComparison holds a comparison to one operator. An explicit empty `in` set
-// counts, being present.
-function validateComparison(c: Comparison, field: string): void {
+/**
+ * TIME_OPERAND is the form `R-QTIMEOP` holds a comparison to, per field it governs.
+ *
+ * The FIELD picks the form rather than admitting either: EDTF takes
+ * `2026-01-01T00:00:02Z` as readily as the fixed-width spelling, so allowing both on a
+ * `V-TIME` field would leave one instant with several spellings — and a text comparison
+ * lands on a different second for each. created_at and dated are record slots of their
+ * own, hence the literals beside the field constants.
+ */
+const TIME_OPERAND: Readonly<Record<string, (s: string) => boolean>> = {
+  created_at: validRFC3339Nano,
+  [FieldDeleteBy]: validRFC3339Nano,
+  [FieldPubkeyValidFrom]: validRFC3339Nano,
+  [FieldPubkeyExpiresAfter]: validRFC3339Nano,
+  dated: validateDated,
+}
+
+// validateComparison holds a comparison to one operator, and its operands to the form
+// `R-QTIMEOP` gives the field compared. An explicit empty `in` set counts, being present.
+function validateComparison(c: Comparison, path: string, on: string): void {
   if (typeof c !== 'object' || c === null || Array.isArray(c)) {
-    throw new RankeQueryError('ErrQueryType', field, `expected an object, got ${kindOf(c)}`)
+    throw new RankeQueryError('ErrQueryType', path, `expected an object, got ${kindOf(c)}`)
   }
   const node = c as Record<string, unknown>
   // An unrecognised operator leaves none applied, so the count already refuses it.
   const set = OPERATORS.filter((op) => node[op] !== undefined)
-  if (set.length === 1 && set[0] === 'in') checkArray(`${field}.in`, node.in)
-  if (set.length === 1 && set[0] === 'glob') checkString(`${field}.glob`, node.glob)
+  if (set.length === 1 && set[0] === 'in') checkArray(`${path}.in`, node.in)
+  if (set.length === 1 && set[0] === 'glob') checkString(`${path}.glob`, node.glob)
   if (set.length !== 1) {
     throw new RankeQueryError(
       'ErrQueryComparisonForm',
-      field,
+      path,
       `exactly one operator (${OPERATORS.join(' | ')}), got ${set.length}`,
     )
+  }
+  const wellFormed = TIME_OPERAND[on]
+  if (wellFormed === undefined) return
+  const scalars = [node.eq, node.ne, node.lt, node.le, node.gt, node.ge]
+  for (const v of [...scalars, ...(Array.isArray(node.in) ? node.in : [])]) {
+    if (v === undefined || v === null) continue
+    if (typeof v !== 'string') {
+      throw new RankeQueryError('ErrQueryTimeOperand', path, `${on} is ${kindOf(v)}`)
+    }
+    if (!wellFormed(v)) {
+      throw new RankeQueryError('ErrQueryTimeOperand', path, `${on}=${v}`)
+    }
+  }
+  // A pattern names no time, being neither form.
+  if (node.glob !== undefined) {
+    throw new RankeQueryError('ErrQueryTimeOperand', path, `${on} glob ${String(node.glob)}`)
   }
 }
 
