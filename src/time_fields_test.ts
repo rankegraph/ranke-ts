@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { FieldDeleteBy, FieldPubkeyExpiresAfter, FieldPubkeyValidFrom } from './field_taxonomy.ts'
-import { checkTimestampFields, timeFields, validRFC3339Nano } from './time_fields.ts'
+import {
+  checkTimestampFields,
+  formatTimestamp,
+  timeFields,
+  validRFC3339Nano,
+} from './time_fields.ts'
 
 // `V-TIME` governs delete_by and the two pubkey bounds as well as created_at. ranke-go
 // mirrors these in verify_time_test.go, where the same three fields went unparsed:
@@ -67,4 +72,17 @@ test('checkTimestampFields passes an absent or canonical value', () => {
   for (const name of timeFields) {
     assert.equal(checkTimestampFields({ [name]: CANONICAL }), null, name)
   }
+})
+
+// formatTimestamp writes what validRFC3339Nano admits, which is the pairing a caller
+// holding a Date relies on: render, then compare against a stored value (`R-QTIMEOP`).
+test('formatTimestamp writes the form the validator admits', () => {
+  for (const iso of ['2026-01-05T12:00:00.000Z', '1970-01-01T00:00:00.000Z', '2030-06-30T23:59:59.999Z']) {
+    const rendered = formatTimestamp(new Date(iso))
+    assert.ok(validRFC3339Nano(rendered), rendered)
+    assert.equal(rendered.length, CANONICAL.length, 'fixed width')
+  }
+  assert.equal(formatTimestamp(new Date('2026-01-05T12:00:00.123Z')), '2026-01-05T12:00:00.123000000Z')
+  // A Date holds no nanoseconds, so the last six digits are zeros rather than lost.
+  assert.equal(formatTimestamp(new Date(Date.UTC(2026, 0, 5))), '2026-01-05T00:00:00.000000000Z')
 })

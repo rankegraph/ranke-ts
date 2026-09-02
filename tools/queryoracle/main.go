@@ -50,6 +50,7 @@ var sentinels = []struct {
 	{"ErrQueryScanShape", ranke.ErrQueryScanShape},
 	{"ErrQueryWhereForm", ranke.ErrQueryWhereForm},
 	{"ErrQueryComparisonForm", ranke.ErrQueryComparisonForm},
+	{"ErrQueryTimeOperand", ranke.ErrQueryTimeOperand},
 	{"ErrQueryHops", ranke.ErrQueryHops},
 	{"ErrQueryOrderField", ranke.ErrQueryOrderField},
 	{"ErrQueryLayerName", ranke.ErrQueryLayerName},
@@ -101,6 +102,42 @@ func main() {
 		{
 			"an explicit empty in set, which is present and so counts",
 			`{"select":{"branch":"main"},"where":{"field":"a","test":{"in":[]}}}`,
+		},
+		// `R-QTIMEOP`: one spelling per time field. A V-TIME field takes the
+		// fixed-width form and `dated` takes EDTF, so an instant has one spelling on
+		// each and a text comparison cannot land on two different seconds.
+		{
+			"created_at at V-TIME's fixed width",
+			`{"select":{"branch":"main"},"where":{"field":"created_at",` +
+				`"test":{"ge":"2026-01-05T12:00:00.000000000Z"}}}`,
+		},
+		{
+			"every V-TIME field a comparison can name",
+			`{"select":{"branch":"main"},"where":{"and":[` +
+				`{"field":"delete_by","test":{"lt":"2030-01-01T00:00:00.000000000Z"}},` +
+				`{"field":"pubkey_valid_from","test":{"le":"2026-01-01T00:00:00.000000000Z"}},` +
+				`{"field":"pubkey_expires_after","test":{"gt":"2027-06-30T23:59:59.999999999Z"}}]}}`,
+		},
+		{
+			"an in set of timestamps, each in the one form",
+			`{"select":{"branch":"main"},"where":{"field":"created_at","test":{"in":[` +
+				`"2026-01-05T12:00:00.000000000Z","2026-01-06T12:00:00.000000000Z"]}}}`,
+		},
+		{
+			"dated as an EDTF year, which is what V-DATED admits",
+			`{"select":{"branch":"main"},"where":{"field":"dated","test":{"eq":"2014"}}}`,
+		},
+		{
+			"dated as an EDTF interval with an open bound",
+			`{"select":{"branch":"main"},"where":{"field":"dated","test":{"ge":"2020.."}}}`,
+		},
+		{
+			"dated as EDTF's date-and-time form, an instant being a Level 1 endpoint",
+			`{"select":{"branch":"main"},"where":{"field":"dated","test":{"eq":"2004-01-01T10:10:10Z"}}}`,
+		},
+		{
+			"a glob on a field no time rule governs",
+			`{"select":{"branch":"main"},"where":{"field":"name","test":{"glob":"a*"}}}`,
 		},
 		{
 			"or and not nested",
@@ -159,6 +196,50 @@ func main() {
 			`{"select":{"branch":"main"},"where":{"field":"a","test":{"eq":1,"ne":2}}}`,
 		},
 		{"a comparison with none", `{"select":{"branch":"main"},"where":{"field":"a","test":{}}}`},
+		// `R-QTIMEOP` refusals. The loose spellings are the ones that used to compare as
+		// text against the stored fixed-width form and name the wrong instant.
+		{
+			"created_at without the fixed-width nanoseconds",
+			`{"select":{"branch":"main"},"where":{"field":"created_at","test":{"ge":"2026-01-05T12:00:00Z"}}}`,
+		},
+		{
+			"created_at as a bare date",
+			`{"select":{"branch":"main"},"where":{"field":"created_at","test":{"eq":"2026-01-05"}}}`,
+		},
+		{
+			"created_at with a numeric offset rather than UTC",
+			`{"select":{"branch":"main"},"where":{"field":"created_at",` +
+				`"test":{"lt":"2026-01-05T12:00:00.000000000+02:00"}}}`,
+		},
+		{
+			"created_at as a number",
+			`{"select":{"branch":"main"},"where":{"field":"created_at","test":{"gt":1767225600}}}`,
+		},
+		{
+			"a glob on created_at, which names no time",
+			`{"select":{"branch":"main"},"where":{"field":"created_at","test":{"glob":"2026-*"}}}`,
+		},
+		{
+			"one loose value inside an in set of timestamps",
+			`{"select":{"branch":"main"},"where":{"field":"created_at","test":{"in":[` +
+				`"2026-01-05T12:00:00.000000000Z","2026-01-06"]}}}`,
+		},
+		{
+			"delete_by at EDTF's precision, where V-TIME governs the field",
+			`{"select":{"branch":"main"},"where":{"field":"delete_by","test":{"lt":"2030"}}}`,
+		},
+		{
+			"dated as a value EDTF Level 1 does not admit",
+			`{"select":{"branch":"main"},"where":{"field":"dated","test":{"eq":"whenever"}}}`,
+		},
+		{
+			"dated as a Level 2 set",
+			`{"select":{"branch":"main"},"where":{"field":"dated","test":{"eq":"{2001,2002}"}}}`,
+		},
+		{
+			"a glob on dated",
+			`{"select":{"branch":"main"},"where":{"field":"dated","test":{"glob":"201*"}}}`,
+		},
 		{"an unknown shape", `{"select":{"branch":"main"},"output":{"shape":"tree"}}`},
 		{"an unknown detail", `{"select":{"branch":"main"},"output":{"detail":"everything"}}`},
 		// "graph" asked for the closed graph, a claim cut down to the edges among the

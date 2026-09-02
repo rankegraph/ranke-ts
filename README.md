@@ -436,6 +436,12 @@ The tag is therefore the one place a version lives, as in ranke-go and
 ranke-graph, where a module version is its tag. JSON takes no comments, so this
 note stands in for one.
 
+`CHANGELOG.md` records what a release changed for someone depending on this
+repository, written under `## Unreleased` as the change is made. `make release` stamps
+that section with the version it cuts and leaves a fresh one behind, so a version
+heading is never typed by hand — and refuses a release whose `## Unreleased` is empty,
+since it would record nothing.
+
 **The version is this library's own.** It says what a semantic version says: whether
 the change breaks a caller, adds to what one can do, or fixes something. So a release
 takes a bump word, and `release-cycle.sh` applies it to the latest tag:
