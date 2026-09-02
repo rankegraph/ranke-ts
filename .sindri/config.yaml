@@ -1,3 +1,4 @@
+architecture: CLAUDE.md
 github:
     issues: true
 verify: make check
