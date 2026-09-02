@@ -6,6 +6,8 @@ rewording does not.
 
 ## Unreleased
 
+## v0.28.0 — 2026-09-02
+
 ### Added
 
 - Reading a bookmark, the record locating an archive's moving head: `idSeq(index,
