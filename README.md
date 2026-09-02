@@ -436,27 +436,29 @@ The tag is therefore the one place a version lives, as in ranke-go and
 ranke-graph, where a module version is its tag. JSON takes no comments, so this
 note stands in for one.
 
-**The version follows ranke-go's.** The major and minor are always the ranke-go this
-tree mirrors, and only the patch drifts: `ranke-ts 0.24.x` implements `ranke-go 0.24.x`,
-whatever `x` is. The patch starts at ranke-go's and steps up to the first free one, so
-consecutive releases against one ranke-go walk it, and a minor or major move upstream
-carries straight across.
-
-| ranke-go | last ranke-ts | next ranke-ts |
-|---|---|---|
-| 0.24.3 | 0.24.3 | 0.24.4 |
-| 0.24.4 | 0.24.4 | 0.24.5 |
-| 0.25.0 | 0.24.5 | 0.25.0 |
-
-So `make release` takes no bump word: for a library whose job is mirroring another,
-what a version can usefully say is which reference it tracks — a fact — rather than
-whether a change breaks anything, which was our own reading each time. The trade is
-that the number no longer signals compatibility on its own; the release notes do.
+**The version is this library's own.** It says what a semantic version says: whether
+the change breaks a caller, adds to what one can do, or fixes something. So a release
+takes a bump word, and `release-cycle.sh` applies it to the latest tag:
 
 ```sh
-make version       # the latest release tag, which is the version this tree answers to
-make next-version  # the version the next release would take
+make release patch    # or fix
+make release minor    # or feature
+make release major    # or breaking
+make version          # the latest release tag, which is the version this tree answers to
 ```
+
+The number was derived from the ranke-go in `tools/go.mod` until 0.26.1 — major and
+minor taken from the reference, only the patch drifting — so that `ranke-ts 0.24.x`
+read as "implements `ranke-go 0.24.x`". That made the version a fact rather than a
+judgement, at the price of the one thing a caller reads a version for: an
+`0.24.3`→`0.25.0` step meant the reference moved, and said nothing about whether this
+library's own surface did. Which ranke-go a release mirrors is recorded where it is
+checkable instead — `tools/go.mod`, and the provenance stamped into every generated
+fixture — and the version is free to describe this package.
+
+Mirroring ranke-go is unchanged by this: `ranke-go-check` still holds the pin to the
+latest release and the fixtures to the pin, and `verify` still fails when the reference
+moves and this code has not.
 
 ## Licence
 
